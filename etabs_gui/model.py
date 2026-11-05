@@ -215,6 +215,59 @@ class Project:
             section["area"] = area
             section["inertia"] = inertia
 
+    def rename_section(self, old: str, new: str) -> int:
+        """Renombra una sección en su definición y en todas sus asignaciones.
+
+        Devuelve la cantidad de asignaciones actualizadas, o -1 si el nombre
+        nuevo ya existe. Un nombre vacío o igual devuelve 0 sin cambios.
+        """
+        old = str(old).strip()
+        new = str(new).strip()
+        if not old or not new or old == new:
+            return 0
+        existing = {str(s.get("name", "")).strip().lower() for s in self.frame_sections
+                    if str(s.get("name", "")).strip() != old}
+        if new.lower() in existing:
+            return -1
+        for section in self.frame_sections:
+            if str(section.get("name", "")).strip() == old:
+                section["name"] = new
+        changed = 0
+        for key in ("column_sections", "beam_sections"):
+            mapping = self.assignments.get(key, {})
+            for item, name in list(mapping.items()):
+                if name == old:
+                    mapping[item] = new
+                    changed += 1
+            self.assignments[key] = mapping
+        self.dirty = True
+        return changed
+
+    def rename_material(self, old: str, new: str) -> int:
+        """Renombra un material en su definición y en las secciones que lo usan.
+
+        Devuelve la cantidad de referencias actualizadas, o -1 si el nombre
+        nuevo ya existe.
+        """
+        old = str(old).strip()
+        new = str(new).strip()
+        if not old or not new or old == new:
+            return 0
+        existing = {str(m.get("name", "")).strip().lower() for m in self.materials
+                    if str(m.get("name", "")).strip() != old}
+        if new.lower() in existing:
+            return -1
+        for material in self.materials:
+            if str(material.get("name", "")).strip() == old:
+                material["name"] = new
+        changed = 0
+        for item in self.frame_sections + self.slabs + self.walls:
+            if str(item.get("material", "")).strip() == old:
+                item["material"] = new
+                changed += 1
+        self.dirty = True
+        return changed
+
     def section_names(self, element: str = "") -> list[str]:
         if not element:
             return [s["name"] for s in self.frame_sections]

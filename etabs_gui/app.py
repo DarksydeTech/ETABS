@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .etabs import EtabsBridge
 from .model import Issue, Project, to_float, to_int
@@ -54,6 +54,9 @@ class Table(ttk.Frame):
                              anchor=column.get("anchor", "w"), stretch=False)
         self.tree.bind("<Double-1>", self._edit)
         self.tree.bind("<Return>", self._edit)
+        self.tree.bind("<Button-1>", self._remember_cell, add="+")
+        self.tree.bind("<Key>", self._type_to_edit)
+        self._active_column = 0
 
     def set_rows(self, rows: list[dict]) -> None:
         self.rows = [dict(row) for row in rows]
@@ -66,56 +69,136 @@ class Table(ttk.Frame):
         item = self.tree.selection()
         return int(item[0]) if item else None
 
-    def _edit(self, event=None) -> None:
+    def _remember_cell(self, event) -> None:
+        column_id = self.tree.identify_column(event.x)
+        if column_id:
+            self._active_column = int(column_id.replace("#", "")) - 1
+
+    def _edit(self, event=None) -> str | None:
         if event is not None and getattr(event, "y", None) is not None:
             row_id = self.tree.identify_row(event.y)
             column_id = self.tree.identify_column(event.x)
             if not row_id or not column_id:
-                return
+                return None
             self.tree.selection_set(row_id)
+            position = int(column_id.replace("#", "")) - 1
         else:
-            row_id = self.tree.selection()[0] if self.tree.selection() else None
-            column_id = "#1"
-        if not row_id:
+            current = self.tree.selection()
+            if not current:
+                return None
+            row_id = current[0]
+            position = self._active_column
+        self._open_editor(int(row_id), position)
+        return "break"
+
+    def _type_to_edit(self, event) -> str | None:
+        """Escribir sobre la celda seleccionada abre el editor en el sitio."""
+        character = getattr(event, "char", "")
+        if not character or not character.isprintable():
+            return None
+        current = self.tree.selection()
+        if not current:
+            return None
+        position = self._active_column
+        if not (0 <= position < len(self.columns)):
+            return None
+        column = self.columns[position]
+        if column.get("readonly") or column.get("options"):
+            return None
+        if column.get("numeric") and character not in "0123456789,.-":
+            return None
+        self._open_editor(int(current[0]), position, initial=character)
+        return "break"
+
+    def _open_editor(self, index: int, position: int, initial: str = "") -> None:
+        if not (0 <= position < len(self.columns)):
             return
-        index = int(row_id)
-        column_index = int(column_id.replace("#", "")) - 1
-        if not (0 <= column_index < len(self.columns)):
-            return
-        column = self.columns[column_index]
+        column = self.columns[position]
         if column.get("readonly"):
             return
+        self._active_column = position
+        self.tree.selection_set(str(index))
         if column.get("options"):
-            self._edit_options(index, column)
-            return
-        row = self.rows[index]
-        old = row.get(column["key"], "")
-        value = simpledialog.askstring(
-            "Editar", f"{column['label']}\nFila {index + 1}",
-            initialvalue=fmt(old), parent=self.winfo_toplevel())
-        if value is None:
-            return
-        value = value.strip()
-        if column.get("numeric"):
-            if value == "":
-                parsed = 0.0
-            else:
-                try:
-                    parsed = float(value.replace(",", "."))
-                except ValueError:
-                    messagebox.showerror("Valor inválido", f"'{value}' no es un número.")
-                    return
+            self._edit_options(index, position)
         else:
-            parsed = value
-        if column.get("options") and parsed not in column["options"]:
-            messagebox.showerror("Valor inválido",
-                                 f"Use uno de: {', '.join(column['options'])}")
-            return
-        if self.on_edit:
-            self.on_edit(index, column["key"], parsed)
+            self._edit_text(index, position, initial)
 
-    def _edit_options(self, index: int, column: dict) -> None:
+    def _next_editable(self, position: int, step: int) -> int | None:
+        candidate = position + step
+        while 0 <= candidate < len(self.columns):
+            if not self.columns[candidate].get("readonly"):
+                return candidate
+            candidate += step
+        return None
+
+    def _edit_text(self, index: int, position: int, initial: str = "") -> None:
+        """Editor de texto en la propia celda, sin cuadros flotantes."""
+        column = self.columns[position]
+        bbox = self.tree.bbox(str(index), column["key"])
+        if not bbox:
+            return
+        x, y, width, height = bbox
+        previous = fmt(self.rows[index].get(column["key"], ""))
+        value = tk.StringVar(value=initial or previous)
+        entry = ttk.Entry(self.tree, textvariable=value)
+        entry.place(x=x, y=y, width=max(width, 80), height=height)
+        entry.focus_set()
+        entry.select_range(0, "end")
+        entry.icursor("end")
+        state = {"done": False}
+
+        def finish(apply: bool, step: int = 0) -> None:
+            if state["done"]:
+                return
+            text = value.get().strip()
+            parsed = text
+            if apply and column.get("numeric"):
+                if text == "":
+                    parsed = 0.0
+                else:
+                    try:
+                        parsed = float(text.replace(",", "."))
+                    except ValueError:
+                        messagebox.showerror("Valor inválido",
+                                             f"'{text}' no es un número.", parent=self)
+                        entry.focus_set()
+                        return
+            state["done"] = True
+            entry.destroy()
+            if apply and fmt(parsed) != previous and self.on_edit:
+                self.on_edit(index, column["key"], parsed)
+            if step:
+                target = self._next_editable(position, step)
+                if target is not None:
+                    self.after(10, lambda: self._open_editor(index, target))
+
+        def on_return(_event=None) -> str:
+            finish(True)
+            return "break"
+
+        def on_tab(_event=None) -> str:
+            finish(True, 1)
+            return "break"
+
+        def on_shift_tab(_event=None) -> str:
+            finish(True, -1)
+            return "break"
+
+        def on_escape(_event=None) -> str:
+            finish(False)
+            return "break"
+
+        entry.bind("<Return>", on_return)
+        entry.bind("<KP_Enter>", on_return)
+        entry.bind("<Tab>", on_tab)
+        entry.bind("<Shift-Tab>", on_shift_tab)
+        entry.bind("<ISO_Left_Tab>", on_shift_tab)
+        entry.bind("<Escape>", on_escape)
+        entry.bind("<FocusOut>", lambda _e: finish(True))
+
+    def _edit_options(self, index: int, position: int) -> None:
         """Lista desplegable sobre la celda, como en la plantilla de Excel."""
+        column = self.columns[position]
         bbox = self.tree.bbox(str(index), column["key"])
         if not bbox:
             return
@@ -134,7 +217,7 @@ class Table(ttk.Frame):
             combo.current(options.index(value.get()))
         state = {"done": False}
 
-        def close(apply: bool) -> None:
+        def close(apply: bool, step: int = 0) -> None:
             if state["done"]:
                 return
             state["done"] = True
@@ -142,11 +225,19 @@ class Table(ttk.Frame):
             combo.destroy()
             if apply and chosen != current and self.on_edit:
                 self.on_edit(index, column["key"], chosen)
+            if step:
+                target = self._next_editable(position, step)
+                if target is not None:
+                    self.after(10, lambda: self._open_editor(index, target))
+
+        def on_tab(_event=None) -> str:
+            close(True, 1)
+            return "break"
 
         combo.bind("<<ComboboxSelected>>", lambda _e: close(True))
-        combo.bind("<Return>", lambda _e: close(True))
-        combo.bind("<Tab>", lambda _e: close(True))
-        combo.bind("<Escape>", lambda _e: close(False))
+        combo.bind("<Return>", lambda _e: (close(True), "break")[1])
+        combo.bind("<Tab>", on_tab)
+        combo.bind("<Escape>", lambda _e: (close(False), "break")[1])
         combo.bind("<FocusOut>", lambda _e: close(True))
 
 
@@ -780,9 +871,27 @@ class EtabsApp(tk.Tk):
 
     # -- materiales -------------------------------------------------------
     def _edit_material(self, index: int, key: str, value) -> None:
-        self.project.materials[index][key] = value
+        material = self.project.materials[index]
+        if key == "name":
+            old = str(material.get("name", ""))
+            new = str(value or "").strip()
+            if new == old:
+                return
+            if not new:
+                messagebox.showwarning("Nombre vacío", "El material necesita un nombre.")
+                self.refresh_all()
+                return
+            changed = self.project.rename_material(old, new)
+            if changed < 0:
+                messagebox.showwarning("Nombre en uso",
+                                       f"Ya existe un material llamado '{new}'.")
+            self.refresh_all()
+            if changed >= 0:
+                self.status.set(f"Material '{old}' renombrado a '{new}' "
+                                f"({changed} referencias actualizadas).")
+            return
+        material[key] = value
         if key in ("fc", "fy", "fm"):
-            material = self.project.materials[index]
             if material.get("kind") == "Concrete":
                 material["E"] = max(1.0, 15000.0 * (to_float(material.get("fc")) ** 0.5))
             elif material.get("kind") == "Masonry":
@@ -821,6 +930,26 @@ class EtabsApp(tk.Tk):
 
     def _edit_section(self, index: int, key: str, value) -> None:
         section = self.project.frame_sections[index]
+        if key == "name":
+            old = str(section.get("name", ""))
+            new = str(value or "").strip()
+            if new == old:
+                return
+            if not new:
+                messagebox.showwarning("Nombre vacío", "La sección necesita un nombre.")
+                self.refresh_all()
+                return
+            changed = self.project.rename_section(old, new)
+            if changed < 0:
+                messagebox.showwarning("Nombre en uso",
+                                       f"Ya existe una sección llamada '{new}'.")
+                self.refresh_all()
+                return
+            self.project.generate_plan()
+            self.refresh_all()
+            self.status.set(f"Sección '{old}' renombrada a '{new}' "
+                            f"({changed} asignaciones actualizadas).")
+            return
         section[key] = value
         if key == "element":
             f22, f33 = section_modifiers(str(value))
