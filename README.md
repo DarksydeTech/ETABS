@@ -72,6 +72,10 @@ sobre la celda (o `Enter`), y los cambios regeneran la planta y la validación.
   guarda el proyecto en JSON.
 - **Validar**: revisa alturas, elevaciones, grillas duplicadas, secciones y
   materiales sin asignar, y objetos de planta faltantes.
+- **Edición de tablas**: doble clic en una celda. Las columnas con valores
+  fijos (tipo, geometría, modelado, slab type, material, elemento, sección,
+  dirección del sismo, tipo de combinación, patrón de masa) abren una lista
+  desplegable; las demás abren un cuadro de texto.
 
 ## Módulos
 

@@ -9,7 +9,8 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from .etabs import EtabsBridge
 from .model import Issue, Project, to_float, to_int
 from .template import (APP_NAME, APP_VERSION, GEOMETRY_OPTIONS, MODEL_TYPES,
-                       SLAB_MOD_LABELS, SLAB_TYPES, WALL_MOD_LABELS)
+                       SLAB_MOD_LABELS, SLAB_TYPES, WALL_MOD_LABELS,
+                       section_modifiers)
 
 
 # --------------------------------------------------------------------------
@@ -84,6 +85,9 @@ class Table(ttk.Frame):
         column = self.columns[column_index]
         if column.get("readonly"):
             return
+        if column.get("options"):
+            self._edit_options(index, column)
+            return
         row = self.rows[index]
         old = row.get(column["key"], "")
         value = simpledialog.askstring(
@@ -109,6 +113,41 @@ class Table(ttk.Frame):
             return
         if self.on_edit:
             self.on_edit(index, column["key"], parsed)
+
+    def _edit_options(self, index: int, column: dict) -> None:
+        """Lista desplegable sobre la celda, como en la plantilla de Excel."""
+        bbox = self.tree.bbox(str(index), column["key"])
+        if not bbox:
+            return
+        x, y, width, height = bbox
+        current = fmt(self.rows[index].get(column["key"], ""))
+        options = column["options"]
+        options = list(options() if callable(options) else options)
+        if current and current not in options:
+            options.insert(0, current)
+        value = tk.StringVar(value=current)
+        combo = ttk.Combobox(self.tree, textvariable=value, values=options,
+                             state="readonly")
+        combo.place(x=x, y=y, width=max(width, 110), height=height)
+        combo.focus_set()
+        if value.get() in options:
+            combo.current(options.index(value.get()))
+        state = {"done": False}
+
+        def close(apply: bool) -> None:
+            if state["done"]:
+                return
+            state["done"] = True
+            chosen = value.get()
+            combo.destroy()
+            if apply and chosen != current and self.on_edit:
+                self.on_edit(index, column["key"], chosen)
+
+        combo.bind("<<ComboboxSelected>>", lambda _e: close(True))
+        combo.bind("<Return>", lambda _e: close(True))
+        combo.bind("<Tab>", lambda _e: close(True))
+        combo.bind("<Escape>", lambda _e: close(False))
+        combo.bind("<FocusOut>", lambda _e: close(True))
 
 
 def _dialog_text(parent, title: str, text: str) -> None:
@@ -337,6 +376,9 @@ class EtabsApp(tk.Tk):
         self.material_table.pack(fill="both", expand=True)
 
     # -- secciones --------------------------------------------------------
+    def _material_options(self) -> list[str]:
+        return [str(m.get("name", "")) for m in self.project.materials if m.get("name")]
+
     def _build_sections_tab(self) -> None:
         counts = ttk.LabelFrame(self.tab_sections, text=" Cantidad por tipo de sección ")
         counts.pack(fill="x", pady=(0, 8))
@@ -359,8 +401,11 @@ class EtabsApp(tk.Tk):
                    command=self.remove_section).grid(row=2, column=10, pady=4)
         self.section_table = Table(self.tab_sections, [
             {"key": "name", "label": "Nombre", "width": 150},
-            {"key": "material", "label": "Material", "width": 165},
-            {"key": "element", "label": "Elemento", "width": 120},
+            {"key": "material", "label": "Material", "width": 165,
+             "options": self._material_options},
+            {"key": "element", "label": "Elemento", "width": 120,
+             "options": ["Columna", "Viga Principal", "Viga Secundaria",
+                         "Viga de Borde"]},
             {"key": "geometry", "label": "Geometría", "width": 120, "options": GEOMETRY_OPTIONS},
             {"key": "d", "label": "d cm", "width": 65, "numeric": True, "anchor": "e"},
             {"key": "bf", "label": "bf cm", "width": 65, "numeric": True, "anchor": "e"},
@@ -384,7 +429,8 @@ class EtabsApp(tk.Tk):
 
         slab_columns = [
             {"key": "name", "label": "Nombre", "width": 130},
-            {"key": "material", "label": "Material", "width": 165},
+            {"key": "material", "label": "Material", "width": 165,
+             "options": self._material_options},
             {"key": "model_type", "label": "Modeling", "width": 110, "options": MODEL_TYPES},
             {"key": "slab_type", "label": "Slab type", "width": 100, "options": SLAB_TYPES},
             {"key": "thickness", "label": "e cm", "width": 65, "numeric": True, "anchor": "e"},
@@ -397,7 +443,8 @@ class EtabsApp(tk.Tk):
 
         wall_columns = [
             {"key": "name", "label": "Nombre", "width": 130},
-            {"key": "material", "label": "Material", "width": 165},
+            {"key": "material", "label": "Material", "width": 165,
+             "options": self._material_options},
             {"key": "model_type", "label": "Modeling", "width": 110, "options": MODEL_TYPES},
             {"key": "thickness", "label": "e cm", "width": 65, "numeric": True, "anchor": "e"},
         ] + [{"key": f"mod{i}", "label": label, "width": 65, "numeric": True, "anchor": "e"}
@@ -477,7 +524,8 @@ class EtabsApp(tk.Tk):
         ttk.Button(row, text="+ Fila", command=self.add_mass_factor).pack(side="right")
         ttk.Button(row, text="Eliminar", command=self.remove_mass_factor).pack(side="right", padx=4)
         self.mass_table = Table(mass_tab, [
-            {"key": "pattern", "label": "Load Pattern", "width": 180},
+            {"key": "pattern", "label": "Load Pattern", "width": 180,
+             "options": lambda: [p["name"] for p in self.project.patterns]},
             {"key": "factor", "label": "Factor", "width": 100, "numeric": True, "anchor": "e"},
         ], height=8, on_edit=self._edit_mass_factor)
         self.mass_table.pack(fill="both", expand=True, pady=6)
@@ -569,6 +617,7 @@ class EtabsApp(tk.Tk):
     def refresh_all(self) -> None:
         self._loading = True
         project = self.project
+        project.refresh_section_properties()
         self.name_var.set(project.name)
         self.desc_var.set(project.description)
         self.story_count.set(len(project.stories))
@@ -773,6 +822,10 @@ class EtabsApp(tk.Tk):
     def _edit_section(self, index: int, key: str, value) -> None:
         section = self.project.frame_sections[index]
         section[key] = value
+        if key == "element":
+            f22, f33 = section_modifiers(str(value))
+            section["f22"] = f22
+            section["f33"] = f33
         self.project.refresh_section_properties()
         self.project.generate_plan()
         self.refresh_all()
@@ -927,12 +980,17 @@ class EtabsApp(tk.Tk):
             return
         view = self.plan_view.get()
         plan = self.project.plan
+        frame_options = [s["name"] for s in self.project.frame_sections] + ["VACIO"]
+        wall_options = [w["name"] for w in self.project.walls] + ["VACIO"]
+        slab_options = [s["name"] for s in self.project.slabs] + ["VACIO"]
+        column_options = [c.id for c in plan.columns]
         if view == "Columnas":
             columns = [{"key": "id", "label": "ID", "width": 90, "readonly": True},
                        {"key": "kind", "label": "Tipo", "width": 90, "readonly": True},
                        {"key": "x", "label": "X", "width": 80, "readonly": True, "anchor": "e"},
                        {"key": "y", "label": "Y", "width": 80, "readonly": True, "anchor": "e"},
-                       {"key": "section", "label": "Sección", "width": 180},
+                       {"key": "section", "label": "Sección", "width": 180,
+                        "options": frame_options},
                        {"key": "angle", "label": "Giro (°)", "width": 80, "numeric": True, "anchor": "e"}]
             rows = [{"id": c.id, "kind": c.kind, "x": c.x, "y": c.y,
                      "section": c.section, "angle": c.angle} for c in plan.columns]
@@ -947,16 +1005,20 @@ class EtabsApp(tk.Tk):
                        {"key": "col_b", "label": "Col B", "width": 90, "readonly": True},
                        {"key": "x", "label": "X centro", "width": 90, "readonly": True, "anchor": "e"},
                        {"key": "y", "label": "Y centro", "width": 90, "readonly": True, "anchor": "e"},
-                       {"key": "section", "label": "Sección", "width": 190}]
+                       {"key": "section", "label": "Sección", "width": 190,
+                        "options": frame_options}]
             rows = [{"id": b.id, "grid": b.grid, "col_a": b.col_a, "col_b": b.col_b,
                      "x": b.x, "y": b.y, "section": b.section} for b in beams]
             kind = "beam"
         elif view == "Muros":
             columns = [{"key": "id", "label": "ID", "width": 90, "readonly": True},
-                       {"key": "col_a", "label": "Columna A", "width": 110},
-                       {"key": "col_b", "label": "Columna B", "width": 110},
+                       {"key": "col_a", "label": "Columna A", "width": 110,
+                        "options": column_options},
+                       {"key": "col_b", "label": "Columna B", "width": 110,
+                        "options": column_options},
                        {"key": "length", "label": "Longitud", "width": 90, "readonly": True, "anchor": "e"},
-                       {"key": "section", "label": "Sección", "width": 170}]
+                       {"key": "section", "label": "Sección", "width": 170,
+                        "options": wall_options}]
             rows = [{"id": w.id, "col_a": w.col_a, "col_b": w.col_b,
                      "length": w.length, "section": w.section} for w in plan.walls]
             kind = "wall"
@@ -965,7 +1027,8 @@ class EtabsApp(tk.Tk):
                        {"key": "vertices", "label": "Vértices", "width": 330, "readonly": True},
                        {"key": "x", "label": "X centro", "width": 90, "readonly": True, "anchor": "e"},
                        {"key": "y", "label": "Y centro", "width": 90, "readonly": True, "anchor": "e"},
-                       {"key": "section", "label": "Sección", "width": 160}]
+                       {"key": "section", "label": "Sección", "width": 160,
+                        "options": slab_options}]
             rows = [{"id": s.id, "vertices": ", ".join(s.vertex_ids),
                      "x": s.centroid[0], "y": s.centroid[1], "section": s.section}
                     for s in plan.slabs]

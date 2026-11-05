@@ -156,10 +156,30 @@ def section_properties(geometry: str, d: float, bf: float, tw: float, tf: float)
     if geometry == "Circular":
         return math.pi * d ** 2 / 4.0, math.pi * d ** 4 / 64.0
     if geometry == "Tipo_L":
-        area = d * tw + (bf - tw) * tf
-        return area, 0.0
+        # Ala horizontal (bf x tf) unida a un ala vertical (d x tw) en el borde.
+        web = d * tw
+        flange = max(bf - tw, 0.0) * tf
+        area = web + flange
+        if area <= 0:
+            return 0.0, 0.0
+        y_web, y_flange = d / 2.0, tf / 2.0
+        y_bar = (web * y_web + flange * y_flange) / area
+        i_top = (tw * d ** 3 / 12.0 + web * y_web ** 2
+                 + (bf - tw) * tf ** 3 / 12.0 + flange * y_flange ** 2)
+        return area, i_top - area * y_bar ** 2
     if geometry == "Tipo_T":
-        return bf * tf + (d - tf) * tw, 0.0
+        # Ala superior (bf x tf) más alma (d - tf) x tw.
+        web_height = max(d - tf, 0.0)
+        flange = bf * tf
+        web = web_height * tw
+        area = flange + web
+        if area <= 0:
+            return 0.0, 0.0
+        y_flange, y_web = tf / 2.0, tf + web_height / 2.0
+        y_bar = (flange * y_flange + web * y_web) / area
+        i_top = (bf * tf ** 3 / 12.0 + flange * y_flange ** 2
+                 + tw * web_height ** 3 / 12.0 + web * y_web ** 2)
+        return area, i_top - area * y_bar ** 2
     if geometry == "Perfil_I":
         area = 2 * bf * tf + (d - 2 * tf) * tw
         inertia = (tw * (d - 2 * tf) ** 3 + 2 * (bf * tf ** 3 + 12 * bf * tf * ((d - tf) / 2) ** 2)) / 12.0
