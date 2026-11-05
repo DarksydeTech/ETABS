@@ -40,6 +40,8 @@ sobre la celda (o `Enter`), y los cambios regeneran la planta y la validación.
      Circular, Perfil_I, Tubo_Rectangular, Tubo_Circular, Tipo_T, Tipo_L),
      dimensiones en cm y factores de fisuración `f22`/`f33`.
      Área e inercia se calculan solas.
+   - La vista lateral dibuja la sección seleccionada a escala (forma, `d`,
+     `bf`, área e `I33`) y se actualiza al cambiar cualquier dato.
 4. **Losas y muros**
    - Losas: material, tipo de modelado, `Slab type`, espesor y modificadores.
    - Muros: material, tipo de modelado, espesor, modificadores y qué columnas

@@ -241,6 +241,178 @@ class Table(ttk.Frame):
         combo.bind("<FocusOut>", lambda _e: close(True))
 
 
+class SectionPreview(ttk.Frame):
+    """Vista a escala de la sección en edición, con sus dimensiones."""
+
+    CONCRETE = ("#dbeafe", "#1d4ed8")
+    STEEL = ("#e2e8f0", "#334155")
+
+    def __init__(self, master, width: int = 330, height: int = 400) -> None:
+        super().__init__(master)
+        self.canvas = tk.Canvas(self, width=width, height=height, bg="white",
+                                highlightthickness=1, highlightbackground="#c9d3df")
+        self.canvas.pack(fill="both", expand=True)
+        self._section: dict | None = None
+        self.canvas.bind("<Configure>", lambda _event: self.redraw())
+
+    def show(self, section: dict | None) -> None:
+        self._section = dict(section) if section else None
+        self.redraw()
+
+    # -- dibujo -----------------------------------------------------------
+    def redraw(self) -> None:
+        canvas = self.canvas
+        canvas.delete("all")
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        if width <= 1:
+            width = int(canvas["width"])
+        if height <= 1:
+            height = int(canvas["height"])
+        section = self._section
+        if not section:
+            canvas.create_text(width / 2, height / 2, fill="#64748b",
+                               text="Seleccione una sección")
+            return
+
+        name = str(section.get("name", "") or "Sección")
+        geometry = str(section.get("geometry", "") or "Rectangular")
+        element = str(section.get("element", "") or "").strip()
+        material = str(section.get("material", "") or "")
+        d = to_float(section.get("d"), 0.0)
+        bf = to_float(section.get("bf"), 0.0)
+        tw = to_float(section.get("tw"), 0.0)
+        tf = to_float(section.get("tf"), 0.0)
+        circular = geometry in ("Circular", "Tubo_Circular")
+        model_w = d if circular else bf
+        model_h = d
+
+        missing: list[str] = []
+        if model_w <= 0:
+            missing.append("bf" if not circular else "d")
+        if model_h <= 0:
+            missing.append("d")
+        if geometry in ("Tipo_T", "Tipo_L", "Perfil_I", "Tubo_Rectangular"):
+            if tw <= 0:
+                missing.append("tw")
+            if tf <= 0:
+                missing.append("tf")
+        elif geometry == "Tubo_Circular" and tw <= 0:
+            missing.append("tw")
+
+        header = f"{name}"
+        canvas.create_text(width / 2, 14, text=header, fill="#0f172a",
+                           font=("Segoe UI", 10, "bold"), width=width - 20,
+                           justify="center")
+        canvas.create_text(width / 2, 30, text=f"{geometry} · {element or 'sin elemento'}",
+                           fill="#475569", font=("Segoe UI", 8))
+
+        info_top = height - 88
+        if missing:
+            canvas.create_text(width / 2, (30 + info_top) / 2, fill="#b91c1c",
+                               font=("Segoe UI", 9), justify="center",
+                               text="Faltan dimensiones: " + ", ".join(sorted(set(missing))))
+            self._draw_info(section, width, info_top)
+            return
+
+        top = 44
+        margin_x = 56
+        available = info_top - top - 30
+        scale = min((width - margin_x) / model_w, available / model_h)
+        if scale <= 0:
+            canvas.create_text(width / 2, height / 2, text="Sin escala disponible",
+                               fill="#b91c1c")
+            return
+        draw_w, draw_h = model_w * scale, model_h * scale
+        x0 = (width - draw_w) / 2
+        y0 = top
+        fill, line = self.CONCRETE if "concreto" in material.lower() else self.STEEL
+
+        def px(value: float) -> float:
+            return x0 + value * scale
+
+        def py(value: float) -> float:
+            return y0 + value * scale
+
+        if geometry in ("Rectangular",):
+            canvas.create_rectangle(px(0), py(0), px(bf), py(d),
+                                    fill=fill, outline=line, width=1.6)
+        elif geometry == "Circular":
+            canvas.create_oval(px(0), py(0), px(d), py(d),
+                               fill=fill, outline=line, width=1.6)
+        elif geometry == "Tubo_Circular":
+            canvas.create_oval(px(0), py(0), px(d), py(d),
+                               fill=fill, outline=line, width=1.6)
+            inner = d - 2 * tw
+            if inner > 0:
+                canvas.create_oval(px(tw), py(tw), px(d - tw), py(d - tw),
+                                   fill="white", outline=line, width=1.2)
+        elif geometry == "Tubo_Rectangular":
+            canvas.create_rectangle(px(0), py(0), px(bf), py(d),
+                                    fill=fill, outline=line, width=1.6)
+            if bf - 2 * tw > 0 and d - 2 * tf > 0:
+                canvas.create_rectangle(px(tw), py(tf), px(bf - tw), py(d - tf),
+                                        fill="white", outline=line, width=1.2)
+        elif geometry == "Tipo_T":
+            points = [px(0), py(0), px(bf), py(0), px(bf), py(tf),
+                      px((bf + tw) / 2), py(tf), px((bf + tw) / 2), py(d),
+                      px((bf - tw) / 2), py(d), px((bf - tw) / 2), py(tf),
+                      px(0), py(tf)]
+            canvas.create_polygon(points, fill=fill, outline=line, width=1.6)
+        elif geometry == "Tipo_L":
+            points = [px(0), py(0), px(tw), py(0), px(tw), py(d - tf),
+                      px(bf), py(d - tf), px(bf), py(d), px(0), py(d)]
+            canvas.create_polygon(points, fill=fill, outline=line, width=1.6)
+        elif geometry == "Perfil_I":
+            points = [px(0), py(0), px(bf), py(0), px(bf), py(tf),
+                      px((bf + tw) / 2), py(tf), px((bf + tw) / 2), py(d - tf),
+                      px(bf), py(d - tf), px(bf), py(d), px(0), py(d),
+                      px(0), py(d - tf), px((bf - tw) / 2), py(d - tf),
+                      px((bf - tw) / 2), py(tf), px(0), py(tf)]
+            canvas.create_polygon(points, fill=fill, outline=line, width=1.6)
+
+        self._dim_h(px(0), px(model_w), py(d) + 14,
+                    f"d = {fmt(d)}" if circular else f"bf = {fmt(bf)}")
+        if not circular:
+            self._dim_v(px(0) - 14, py(0), py(d), f"d = {fmt(d)}")
+        self._draw_info(section, width, info_top)
+
+    def _draw_info(self, section: dict, width: int, top: float) -> None:
+        canvas = self.canvas
+        canvas.create_line(14, top - 6, width - 14, top - 6, fill="#e2e8f0")
+        d = to_float(section.get("d"), 0.0)
+        bf = to_float(section.get("bf"), 0.0)
+        tw = to_float(section.get("tw"), 0.0)
+        tf = to_float(section.get("tf"), 0.0)
+        area = to_float(section.get("area"), 0.0)
+        inertia = to_float(section.get("inertia"), 0.0)
+        lines = [
+            f"A = {fmt(area)} cm²",
+            f"I33 = {fmt(inertia)} cm⁴",
+            f"d {fmt(d)} · bf {fmt(bf)} · tw {fmt(tw)} · tf {fmt(tf)}",
+            f"f22 {fmt(section.get('f22'))} · f33 {fmt(section.get('f33'))}",
+        ]
+        for index, line in enumerate(lines):
+            canvas.create_text(14, top + index * 16, anchor="nw", text=line,
+                               fill="#334155", font=("Consolas", 8))
+
+    def _dim_h(self, x1: float, x2: float, y: float, text: str) -> None:
+        canvas = self.canvas
+        canvas.create_line(x1, y, x2, y, fill="#94a3b8")
+        canvas.create_line(x1, y - 4, x1, y + 4, fill="#94a3b8")
+        canvas.create_line(x2, y - 4, x2, y + 4, fill="#94a3b8")
+        canvas.create_text((x1 + x2) / 2, y + 8, text=text,
+                           fill="#475569", font=("Consolas", 8))
+
+    def _dim_v(self, x: float, y1: float, y2: float, text: str) -> None:
+        canvas = self.canvas
+        canvas.create_line(x, y1, x, y2, fill="#94a3b8")
+        canvas.create_line(x - 4, y1, x + 4, y1, fill="#94a3b8")
+        canvas.create_line(x - 4, y2, x + 4, y2, fill="#94a3b8")
+        canvas.create_text(x - 6, (y1 + y2) / 2, text=text, angle=90,
+                           fill="#475569", font=("Consolas", 8))
+
+
 def _dialog_text(parent, title: str, text: str) -> None:
     window = tk.Toplevel(parent)
     window.title(title)
@@ -269,6 +441,7 @@ class EtabsApp(tk.Tk):
         self.project = Project.new()
         self.bridge = EtabsBridge()
         self._loading = False
+        self._section_index = 0
         self._build()
         self.refresh_all()
         self._center()
@@ -490,24 +663,29 @@ class EtabsApp(tk.Tk):
                    command=self.generate_sections).grid(row=0, column=10, rowspan=2, padx=14)
         ttk.Button(counts, text="Eliminar seleccionada",
                    command=self.remove_section).grid(row=2, column=10, pady=4)
-        self.section_table = Table(self.tab_sections, [
-            {"key": "name", "label": "Nombre", "width": 150},
-            {"key": "material", "label": "Material", "width": 165,
+        body = ttk.Frame(self.tab_sections)
+        body.pack(fill="both", expand=True)
+        self.section_table = Table(body, [
+            {"key": "name", "label": "Nombre", "width": 130},
+            {"key": "material", "label": "Material", "width": 150,
              "options": self._material_options},
-            {"key": "element", "label": "Elemento", "width": 120,
+            {"key": "element", "label": "Elemento", "width": 105,
              "options": ["Columna", "Viga Principal", "Viga Secundaria",
                          "Viga de Borde"]},
-            {"key": "geometry", "label": "Geometría", "width": 120, "options": GEOMETRY_OPTIONS},
-            {"key": "d", "label": "d cm", "width": 65, "numeric": True, "anchor": "e"},
-            {"key": "bf", "label": "bf cm", "width": 65, "numeric": True, "anchor": "e"},
-            {"key": "tw", "label": "tw cm", "width": 65, "numeric": True, "anchor": "e"},
-            {"key": "tf", "label": "tf cm", "width": 65, "numeric": True, "anchor": "e"},
-            {"key": "f22", "label": "f22", "width": 60, "numeric": True, "anchor": "e"},
-            {"key": "f33", "label": "f33", "width": 60, "numeric": True, "anchor": "e"},
-            {"key": "area", "label": "Área cm²", "width": 85, "readonly": True, "anchor": "e"},
-            {"key": "inertia", "label": "I33 cm⁴", "width": 100, "readonly": True, "anchor": "e"},
+            {"key": "geometry", "label": "Geometría", "width": 110, "options": GEOMETRY_OPTIONS},
+            {"key": "d", "label": "d cm", "width": 55, "numeric": True, "anchor": "e"},
+            {"key": "bf", "label": "bf cm", "width": 55, "numeric": True, "anchor": "e"},
+            {"key": "tw", "label": "tw cm", "width": 55, "numeric": True, "anchor": "e"},
+            {"key": "tf", "label": "tf cm", "width": 55, "numeric": True, "anchor": "e"},
+            {"key": "f22", "label": "f22", "width": 50, "numeric": True, "anchor": "e"},
+            {"key": "f33", "label": "f33", "width": 50, "numeric": True, "anchor": "e"},
+            {"key": "area", "label": "Área cm²", "width": 75, "readonly": True, "anchor": "e"},
+            {"key": "inertia", "label": "I33 cm⁴", "width": 90, "readonly": True, "anchor": "e"},
         ], height=20, on_edit=self._edit_section)
-        self.section_table.pack(fill="both", expand=True)
+        self.section_table.pack(side="left", fill="both", expand=True)
+        self.section_preview = SectionPreview(body, width=300, height=400)
+        self.section_preview.pack(side="left", fill="y", padx=(8, 0))
+        self.section_table.tree.bind("<<TreeviewSelect>>", self._preview_section)
 
     # -- losas y muros ----------------------------------------------------
     def _build_areas_tab(self) -> None:
@@ -733,6 +911,15 @@ class EtabsApp(tk.Tk):
         self.inclined_table_y.set_rows(project.inclined_y)
         self.material_table.set_rows(project.materials)
         self.section_table.set_rows(project.frame_sections)
+        if project.frame_sections:
+            self._section_index = min(max(self._section_index, 0),
+                                      len(project.frame_sections) - 1)
+            self.section_table.tree.selection_set(str(self._section_index))
+            self.section_table.tree.see(str(self._section_index))
+            self.section_preview.show(project.frame_sections[self._section_index])
+        else:
+            self._section_index = 0
+            self.section_preview.show(None)
         self.slab_table.set_rows([self._area_row(s, "slab") for s in project.slabs])
         self.wall_table.set_rows([self._area_row(w, "wall") for w in project.walls])
         self.pattern_table.set_rows(project.patterns)
@@ -921,6 +1108,14 @@ class EtabsApp(tk.Tk):
         self.refresh_all()
 
     # -- secciones --------------------------------------------------------
+    def _preview_section(self, _event=None) -> None:
+        index = self.section_table.selection()
+        if index is None:
+            return
+        if 0 <= index < len(self.project.frame_sections):
+            self._section_index = index
+            self.section_preview.show(self.project.frame_sections[index])
+
     def generate_sections(self) -> None:
         for key, var in self.count_vars.items():
             self.project.section_counts[key] = var.get()
