@@ -6,6 +6,10 @@ lógica: los valores por defecto ya están incorporados en el código.
 
 El proyecto se guarda en JSON (`.json`) y se exporta a ETABS por COM.
 
+La documentación técnica completa (arquitectura, cada pantalla, cálculos,
+exportación y checklist de evaluación) está en
+[`DOCUMENTACION_TECNICA.md`](DOCUMENTACION_TECNICA.md).
+
 ## Inicio
 
 En Windows, instala Python 3.10 o posterior y las dependencias:
