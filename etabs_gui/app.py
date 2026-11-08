@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from .etabs import EtabsBridge
 from .architectural_tab import ArchitecturalTab
+from .structural_design_tab import StructuralDesignTab
 from .model import Issue, Project, to_float, to_int
 from .template import (APP_NAME, APP_VERSION, GEOMETRY_OPTIONS, MODEL_TYPES,
                        SLAB_MOD_LABELS, SLAB_TYPES, WALL_MOD_LABELS,
@@ -495,6 +496,7 @@ class EtabsApp(tk.Tk):
         self.tab_plan = ttk.Frame(self.tabs, padding=10)
         self.tab_etabs = ttk.Frame(self.tabs, padding=10)
         self.tab_architectural = ttk.Frame(self.tabs, padding=6)
+        self.tab_structural = ttk.Frame(self.tabs, padding=6)
         for tab, title in ((self.tab_project, "1 · Proyecto y grillas"),
                            (self.tab_materials, "2 · Materiales"),
                            (self.tab_sections, "3 · Secciones"),
@@ -502,7 +504,8 @@ class EtabsApp(tk.Tk):
                            (self.tab_loads, "5 · Cargas"),
                            (self.tab_plan, "6 · Planta"),
                            (self.tab_etabs, "7 · ETABS"),
-                           (self.tab_architectural, "8 · Continuidad arquitectónica")):
+                           (self.tab_architectural, "8 · Continuidad arquitectónica"),
+                           (self.tab_structural, "9 · Predimensionamiento automático")):
             self.tabs.add(tab, text=title)
         self._build_project_tab()
         self._build_materials_tab()
@@ -513,6 +516,9 @@ class EtabsApp(tk.Tk):
         self._build_etabs_tab()
         self.architectural_tab = ArchitecturalTab(self.tab_architectural)
         self.architectural_tab.pack(fill="both", expand=True)
+        self.structural_design_tab = StructuralDesignTab(
+            self.tab_structural, self.architectural_tab, self.project)
+        self.structural_design_tab.pack(fill="both", expand=True)
 
         self.status = tk.StringVar(value="Listo")
         ttk.Label(self, textvariable=self.status, anchor="w", relief="groove",
@@ -891,6 +897,9 @@ class EtabsApp(tk.Tk):
     def refresh_all(self) -> None:
         self._loading = True
         project = self.project
+        if hasattr(self, "structural_design_tab"):
+            self.structural_design_tab.project = project
+            self.structural_design_tab.floor.set(str(max(1, len(project.stories))))
         project.refresh_section_properties()
         self.name_var.set(project.name)
         self.desc_var.set(project.description)
