@@ -16,6 +16,7 @@ class ArchitecturalTab(ttk.Frame):
         super().__init__(master, padding=8)
         self.drawings: list[FloorDrawing] = []
         self.matches = []
+        self.comparisons = []
         self._build()
 
     def _build(self):
@@ -56,6 +57,12 @@ class ArchitecturalTab(ttk.Frame):
         ttk.Combobox(controls, textvariable=self.view_mode, state="readonly",
                      values=("Comparación", "Nivel inferior", "Nivel superior"),
                      width=18).pack(side="left", padx=5)
+        ttk.Label(controls, text="  Par:").pack(side="left")
+        self.pair_var = tk.StringVar()
+        self.pair_selector = ttk.Combobox(controls, textvariable=self.pair_var,
+                                           state="readonly", width=24)
+        self.pair_selector.pack(side="left", padx=5)
+        self.pair_selector.bind("<<ComboboxSelected>>", self.select_pair)
         self.canvas = tk.Canvas(right, bg="#ffffff", highlightthickness=1,
                                 highlightbackground="#cbd5e1")
         self.canvas.pack(fill="both", expand=True)
