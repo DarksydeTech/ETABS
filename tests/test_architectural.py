@@ -34,6 +34,31 @@ class ContinuityTests(unittest.TestCase):
         self.assertAlmostEqual(second.segments[0].x1, 0.0)
         self.assertAlmostEqual(second.segments[0].y1, 0.0)
 
+    def test_same_bounds_do_not_shift_different_segment_density(self):
+        first = FloorDrawing("P1", "p1.dxf", [
+            Segment("W", 0, 0, 10, 0), Segment("W", 10, 0, 10, 8),
+            Segment("W", 10, 8, 0, 8), Segment("W", 0, 8, 0, 0),
+        ])
+        second = FloorDrawing("P2", "p2.dxf", [
+            Segment("W", 0, 0, 5, 0), Segment("W", 5, 0, 10, 0),
+            Segment("W", 10, 0, 10, 4), Segment("W", 10, 4, 10, 8),
+            Segment("W", 10, 8, 5, 8), Segment("W", 5, 8, 0, 8),
+            Segment("W", 0, 8, 0, 4), Segment("W", 0, 4, 0, 0),
+        ])
+        offsets = alignment_offsets_by_bounds([first, second])
+        self.assertEqual(offsets, [(0.0, 0.0), (0.0, 0.0)])
+        apply_alignment_offsets([first, second], offsets)
+        self.assertEqual(second.segments[0].x1, 0.0)
+
+    def test_bounds_alignment_translates_shifted_plan(self):
+        first = FloorDrawing("P1", "p1.dxf", [Segment("W", 0, 0, 10, 8)])
+        second = FloorDrawing("P2", "p2.dxf", [Segment("W", 100, 50, 110, 58)])
+        offsets = alignment_offsets_by_bounds([first, second])
+        self.assertEqual(offsets, [(0.0, 0.0), (-100.0, -50.0)])
+        apply_alignment_offsets([first, second], offsets)
+        self.assertAlmostEqual(second.segments[0].x1, 0.0)
+        self.assertAlmostEqual(second.segments[0].y1, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
