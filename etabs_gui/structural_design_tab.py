@@ -22,6 +22,7 @@ class StructuralDesignTab(ttk.Frame):
         self._fit_transform = None
         self._drag_origin = None
         self._selected_ids = set()
+        self._display_unit_scale = 1.0
         self._build()
 
     def _build(self):
@@ -160,6 +161,7 @@ class StructuralDesignTab(ttk.Frame):
             selected_drawing = next(d for d in drawings if d.name == self.level_var.get())
             number = int(self.floor.get())
             scale = {"m": 1.0, "cm": 0.01, "mm": 0.001}[self.units.get()]
+            self._display_unit_scale = scale
             self.proposal = generate_proposal(
                 selected_drawing, self.architectural_tab.layer_categories,
                 system=self.system.get(), unit_scale=scale,
@@ -217,7 +219,8 @@ class StructuralDesignTab(ttk.Frame):
         drawing = self._current_drawing()
         points = []
         if drawing:
-            points.extend((v, w) for s in drawing.segments
+            points.extend((v * self._display_unit_scale, w * self._display_unit_scale)
+                          for s in drawing.segments
                           for v, w in ((s.x1, s.y1), (s.x2, s.y2)))
         if self.proposal:
             points.extend((n.x, n.y) for n in self.proposal.nodes)
@@ -292,8 +295,10 @@ class StructuralDesignTab(ttk.Frame):
         # DXF as a subdued reference layer, not as the output format of the proposal.
         if drawing:
             for segment in drawing.segments:
-                x1, y1 = screen(segment.x1, segment.y1)
-                x2, y2 = screen(segment.x2, segment.y2)
+                x1, y1 = screen(segment.x1 * self._display_unit_scale,
+                                segment.y1 * self._display_unit_scale)
+                x2, y2 = screen(segment.x2 * self._display_unit_scale,
+                                segment.y2 * self._display_unit_scale)
                 canvas.create_line(x1, y1, x2, y2, fill="#c4cbd4", width=1)
 
         if self.proposal:
