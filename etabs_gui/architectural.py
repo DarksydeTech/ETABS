@@ -48,6 +48,7 @@ class ContinuityMatch:
     overlap_ratio: float
     offset: float
     angle_difference: float
+    side: str = "upper"
 
 
 def _distance_point_line(px: float, py: float, ax: float, ay: float,
@@ -136,11 +137,11 @@ def compare_floors(lower: FloorDrawing, upper: FloorDrawing,
     for upper_index, segment in enumerate(upper.segments):
         ratio, lower_index, offset, angle = _segment_coverage(segment, lower.segments, tolerance, angle_tolerance)
         status = "continuous" if ratio >= full_ratio else "partial" if ratio > 1e-9 else "appears"
-        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle))
+        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle, "upper"))
     for lower_index, segment in enumerate(lower.segments):
         ratio, upper_index, offset, angle = _segment_coverage(segment, upper.segments, tolerance, angle_tolerance)
         status = "continuous" if ratio >= full_ratio else "partial" if ratio > 1e-9 else "disappears"
-        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle))
+        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle, "lower"))
     return matches
 
 def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
