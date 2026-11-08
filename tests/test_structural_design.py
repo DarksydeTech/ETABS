@@ -3,11 +3,21 @@ import unittest
 
 from etabs_gui.architectural import FloorDrawing, Segment
 from etabs_gui.structural_design import (
-    SYSTEMS, evaluate_alternatives, generate_proposal,
+    SYSTEMS, _cluster_points, evaluate_alternatives, generate_proposal,
 )
 
 
 class StructuralProposalTests(unittest.TestCase):
+    def test_point_clustering_is_transitive(self):
+        # A-B and B-C are within tolerance, even though A-C are not.
+        clusters = _cluster_points([
+            (0.00, 0.0, "a", "MUROS"),
+            (0.10, 0.0, "b", "MUROS"),
+            (0.20, 0.0, "c", "MUROS"),
+        ], tolerance=0.11)
+        self.assertEqual(len(clusters), 1)
+        self.assertEqual(len(clusters[0]), 3)
+
     def test_wall_corners_create_candidates(self):
         drawing = FloorDrawing("P1", "p1.dxf", [
             Segment("MUROS", 0, 0, 4, 0),
