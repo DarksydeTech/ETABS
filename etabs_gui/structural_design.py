@@ -181,8 +181,13 @@ def generate_proposal(
                           and (min(first.y, second.y)-tolerance <= n.y <= max(first.y, second.y)+tolerance)]
                 if middle:
                     continue
-                depth = _round_section(length * 100 / 10)
-                width = _round_section(max(25.0, depth * 0.4))
+                if system in (SYSTEMS[0], SYSTEMS[1]):
+                    depth = _round_section(length * 100 / 10)
+                    width = _round_section(max(25.0, depth * 0.4))
+                else:
+                    # No aplicar reglas de vigas de pórticos a albañilería o
+                    # a un sistema mixto aún no definido.
+                    width = depth = 0
                 beams.append(BeamCandidate(f"V-{direction}-{len(beams)+1:03d}",
                                            first.id, second.id, length, direction, width, depth))
 
@@ -233,13 +238,19 @@ def generate_proposal(
     else:
         notes.append("Para pórticos, verifica rigidez lateral en ambas direcciones, derivas, torsión y jerarquía resistente.")
 
-    # Approximate tributary area and axial sizing: explicit assumptions, not code design.
+    # Approximate tributary area and axial sizing only for RC frame columns.
+    column_side = None
     tributary_area = (max_span/2)**2
-    service_load = max(0.0, dead_load + live_load) * tributary_area * max(stories, 1)
-    axial_kgf = service_load * 101.9716
-    area_cm2 = axial_kgf / max(0.35 * fc, 1.0)
-    column_side = _round_section(math.sqrt(max(area_cm2, 0.0)))
-    notes.append(f"Referencia de sección cuadrada preliminar: {column_side}×{column_side} cm, basada en área tributaria supuesta {tributary_area:.2f} m² y carga de servicio {dead_load+live_load:.2f} kN/m²; no sustituye el análisis de cargas ni la verificación de interacción.")
+    if system in (SYSTEMS[0], SYSTEMS[1]):
+        service_load = max(0.0, dead_load + live_load) * tributary_area * max(stories, 1)
+        axial_kgf = service_load * 101.9716
+        area_cm2 = axial_kgf / max(0.35 * fc, 1.0)
+        column_side = _round_section(math.sqrt(max(area_cm2, 0.0)))
+        notes.append(f"Referencia de sección cuadrada preliminar para columnas de pórtico: {column_side}×{column_side} cm, basada en área tributaria supuesta {tributary_area:.2f} m² y carga de servicio {dead_load+live_load:.2f} kN/m²; no sustituye el análisis de cargas ni la verificación de interacción.")
+    elif system == "Albañilería confinada":
+        notes.append("No se asigna una sección de columna de pórtico: los elementos de confinamiento requieren criterios y verificaciones propios de E.070.")
+    else:
+        notes.append("No se asigna una sección de columna hasta definir el sistema resistente mixto y la función de cada elemento.")
     if not nodes:
         notes.append("No se generaron candidatos. Revisa las capas asignadas y la escala del DXF.")
 
