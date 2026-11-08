@@ -27,6 +27,18 @@ class StructuralProposalTests(unittest.TestCase):
         self.assertGreaterEqual(len(result.nodes), 3)
         self.assertGreaterEqual(len(result.beams), 1)
 
+    def test_grid_intersections_guide_supported_column_candidates(self):
+        drawing = FloorDrawing("P1", "p1.dxf", [
+            Segment("MUROS", 0, 0, 4, 0),
+            Segment("EJES", 0, -1, 0, 1),
+            Segment("EJES", -1, 0, 5, 0),
+        ])
+        result = generate_proposal(drawing, tolerance=0.15)
+        self.assertEqual(len(result.grid_lines), 2)
+        self.assertTrue(any(abs(node.x) < 0.01 and abs(node.y) < 0.01 and
+                            "Intersección de ejes" in node.reasons
+                            for node in result.nodes))
+
     def test_unit_conversion_cm_to_m(self):
         drawing = FloorDrawing("P1", "p1.dxf", [Segment("MUROS", 0, 0, 400, 0)])
         result = generate_proposal(drawing, unit_scale=0.01)
