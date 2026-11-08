@@ -118,8 +118,10 @@ def generate_proposal(
     """
     if system not in SYSTEMS:
         raise ValueError("Sistema estructural no reconocido.")
-    if unit_scale <= 0 or tolerance <= 0 or fc <= 0 or stories < 1:
-        raise ValueError("Unidades, tolerancia, fc y número de pisos deben ser positivos.")
+    if unit_scale <= 0 or tolerance <= 0 or fc <= 0 or stories < 1 or max_span <= 0:
+        raise ValueError("Unidades, tolerancia, fc, luz máxima y número de pisos deben ser positivos.")
+    if dead_load < 0 or live_load < 0:
+        raise ValueError("Las cargas muerta y viva no pueden ser negativas.")
     categories = layer_categories or {}
 
     def category(segment):
@@ -170,8 +172,10 @@ def generate_proposal(
                     if (direction == "X" and dy > tolerance) or (direction == "Y" and dx > tolerance):
                         break
                     continue
-                if length < 1.5 or length > max_span:
+                if length < 1.5:
                     continue
+                if length > max_span:
+                    break
                 middle = [n for n in nodes if n.id not in (first.id, second.id)
                           and (min(first.x, second.x)-tolerance <= n.x <= max(first.x, second.x)+tolerance)
                           and (min(first.y, second.y)-tolerance <= n.y <= max(first.y, second.y)+tolerance)]
