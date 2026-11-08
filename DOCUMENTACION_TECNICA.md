@@ -1152,10 +1152,14 @@ ETABS/
     ├── __init__.py
     ├── __main__.py
     ├── app.py
+    ├── architectural.py
+    ├── architectural_tab.py
     ├── etabs.py
     ├── model.py
     ├── plan.py
     ├── project.py            (legado, no usado)
+    ├── structural_design.py
+    ├── structural_design_tab.py
     └── template.py
 ```
 
