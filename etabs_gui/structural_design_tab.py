@@ -30,7 +30,7 @@ class StructuralDesignTab(ttk.Frame):
         self.live = tk.StringVar(value="2")
         self.tolerance = tk.StringVar(value="0.15")
         self.max_span = tk.StringVar(value="7")
-        self.floor = tk.StringVar(value="1")
+        self.floor = tk.StringVar(value=str(max(1, len(project.stories))))
         fields = [
             ("Sistema", self.system, SYSTEMS, 38),
             ("Unidad DXF", self.units, ("m", "cm", "mm"), 7),
@@ -55,6 +55,12 @@ class StructuralDesignTab(ttk.Frame):
         actions.pack(fill="x", pady=(0, 8))
         ttk.Button(actions, text="Generar propuesta y evaluar alternativas",
                    command=self.generate).pack(side="left")
+        self.alt_var = tk.StringVar()
+        ttk.Label(actions, text="Alternativa:").pack(side="left", padx=(12, 3))
+        self.alt_selector = ttk.Combobox(actions, textvariable=self.alt_var,
+                                         state="readonly", width=22)
+        self.alt_selector.pack(side="left")
+        self.alt_selector.bind("<<ComboboxSelected>>", self.show_alternative)
         self.summary = tk.StringVar(value="Importa y clasifica al menos un DXF en la pestaña 8.")
         ttk.Label(actions, textvariable=self.summary).pack(side="left", padx=12)
 
@@ -116,14 +122,21 @@ class StructuralDesignTab(ttk.Frame):
                                                      f"{slab.width:.2f}×{slab.length:.2f} m",
                                                      slab.behavior))
         self.summary.set(f"{len(self.proposal.nodes)} candidatos · {len(self.proposal.beams)} vigas · {len(self.proposal.slabs)} paños")
-        self._draw()
-        details = "\n".join(
-            f"{item['name']}: {item['candidate_count']} candidatos · {item['beam_count']} vigas · puntaje medio {item['mean_score']} — {item['description']}"
-            for item in self.alternatives)
-        details += "\n\n" + "\n".join("• " + note for note in self.proposal.notes)
-        messagebox.showinfo("Alternativas y criterios", details, parent=self)
+        self.alt_selector["values"] = [item["name"] for item in self.alternatives]
+        if self.alternatives:
+            self.alt_selector.current(0)
+        self.show_alternative()
 
-    def _draw(self):
+    def show_alternative(self, _event=None):
+        if not self.proposal or not self.alternatives:
+            return
+        item = next((entry for entry in self.alternatives
+                     if entry["name"] == self.alt_var.get()), self.alternatives[0])
+        self.summary.set(f"{item['name']}: {item['candidate_count']} candidatos · "
+                         f"{item['beam_count']} vigas · puntaje medio {item['mean_score']}")
+        self._draw(set(item["selected_nodes"]))
+
+    def _draw(self, selected_ids=None):
         self.canvas.delete("all")
         if not self.proposal or not self.proposal.nodes:
             self.canvas.create_text(20, 20, anchor="nw", text="Sin candidatos para mostrar.", fill="#64748b")
@@ -135,7 +148,10 @@ class StructuralDesignTab(ttk.Frame):
         height = max(self.canvas.winfo_height()-50, 100)
         scale = min(width/max(xmax-xmin, 1.0), height/max(ymax-ymin, 1.0))
         ox, oy = 25, 25
+        selected_ids = set(selected_ids or (n.id for n in nodes))
         for beam in self.proposal.beams:
+            if beam.start not in selected_ids or beam.end not in selected_ids:
+                continue
             by_id = {n.id:n for n in nodes}
             a, b = by_id[beam.start], by_id[beam.end]
             x1, y1 = ox+(a.x-xmin)*scale, height+oy-(a.y-ymin)*scale
@@ -143,7 +159,8 @@ class StructuralDesignTab(ttk.Frame):
             self.canvas.create_line(x1,y1,x2,y2,fill="#64748b",width=2)
         for node in nodes:
             x, y = ox+(node.x-xmin)*scale, height+oy-(node.y-ymin)*scale
-            self.canvas.create_oval(x-4,y-4,x+4,y+4,fill="#c0392b",outline="")
+            color = "#c0392b" if node.id in selected_ids else "#94a3b8"
+            self.canvas.create_oval(x-4,y-4,x+4,y+4,fill=color,outline="")
             self.canvas.create_text(x+7,y-7,text=node.id,anchor="sw",font=("Segoe UI",7))
         self.canvas.create_text(10, 8, anchor="nw",
                                text=f"{self.proposal.system} · geometría DXF convertida a m",
