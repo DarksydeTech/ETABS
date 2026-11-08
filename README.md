@@ -155,3 +155,37 @@ La continuidad arquitectónica no demuestra que un muro sea estructural ni
 valida su capacidad, detallado o cumplimiento de la E.030/E.060. Antes de usar
 los resultados en el modelo ETABS, verifica capas, escala, orientación y
 geometría.
+
+
+## Etiqueta: `predimensionamiento-estructural-automatico`
+
+La pestaña **9 · Predimensionamiento automático** está conectada con los DXF
+importados y clasificados en la pestaña 8, y toma por defecto la cantidad de
+pisos del proyecto. Reúne tres desarrollos dentro de la misma aplicación:
+
+1. **Propuesta geométrica:** genera candidatos de columnas en extremos e
+   intersecciones de elementos clasificados como muros o columnas, conecta
+   candidatos alineados mediante vigas preliminares y reconoce paños
+   rectangulares únicamente cuando detecta apoyo geométrico en sus cuatro lados.
+2. **Predimensionamiento:** muestra secciones guía de vigas y una referencia
+   inicial de sección de columna; clasifica el comportamiento preliminar de
+   losas según la relación de lados. Permite indicar sistema estructural,
+   unidades DXF, (f'c), cargas, tolerancia y luz máxima.
+3. **Alternativas:** compara tres subconjuntos transparentes de candidatos
+   (mayor regularidad, equilibrada y menor intervención), con puntajes y
+   visualización de los elementos seleccionados.
+
+**Alcance actual:** es un generador de candidatos geométricos y estimaciones
+iniciales, no un dimensionador normativo ni un optimizador estructural validado.
+No calcula áreas tributarias reales por elemento, análisis sísmico, derivas,
+torsión, interacción biaxial, esbeltez, cortante, cimentaciones ni acero de
+refuerzo. La referencia de columna usa un área tributaria supuesta y debe
+reemplazarse por cargas y áreas tributarias obtenidas del modelo. La selección
+de categorías DXF tampoco demuestra que un muro arquitectónico sea portante.
+Las alternativas no se transfieren automáticamente a la planta ETABS: primero
+deben revisarse y aprobarse; no se modifican grillas ni elementos existentes
+de forma silenciosa.
+
+Para sistemas duales, de albañilería confinada o mixtos se muestran advertencias
+específicas: el módulo no dimensiona placas ni verifica la participación del
+sistema, y no debe tratar muros bajos o parapetos como apoyos estructurales.
