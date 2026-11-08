@@ -182,16 +182,18 @@ class ArchitecturalTab(ttk.Frame):
         variables = {}
         for row, layer in enumerate(layers, start=1):
             ttk.Label(inner, text=layer).grid(row=row, column=0, sticky="w", padx=5, pady=3)
-            var = tk.StringVar(value=self.layer_categories.get(layer, default_layer_category(layer)))
+            current_category = self.layer_categories.get(layer, default_layer_category(layer))
+            var = tk.StringVar(value=CATEGORY_LABELS.get(current_category, CATEGORY_LABELS["unknown"]))
             combo = ttk.Combobox(inner, textvariable=var, state="readonly",
-                                 values=list(CATEGORY_LABELS.keys()), width=24)
+                                 values=list(CATEGORY_LABELS.values()), width=30)
             combo.grid(row=row, column=1, sticky="ew", padx=5, pady=3)
             variables[layer] = var
         inner.columnconfigure(1, weight=1)
 
         def save():
+            labels_to_categories = {label: key for key, label in CATEGORY_LABELS.items()}
             for layer, var in variables.items():
-                self.layer_categories[layer] = var.get()
+                self.layer_categories[layer] = labels_to_categories.get(var.get(), "unknown")
             self.matches = []
             self.comparisons = []
             self.pair_selector["values"] = ()
