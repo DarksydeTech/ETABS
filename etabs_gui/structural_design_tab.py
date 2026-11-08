@@ -144,7 +144,7 @@ class StructuralDesignTab(ttk.Frame):
         self.summary.set(f"{len(self.proposal.nodes)} candidatos · {len(self.proposal.beams)} vigas · {len(self.proposal.slabs)} paños")
         self.notes_text.configure(state="normal")
         self.notes_text.delete("1.0", "end")
-        self.notes_text.insert("1.0", "\\n".join(f"• {note}" for note in self.proposal.notes))
+        self.notes_text.insert("1.0", "\n".join(f"• {note}" for note in self.proposal.notes))
         self.notes_text.configure(state="disabled")
         self.alt_selector["values"] = [item["name"] for item in self.alternatives]
         if self.alternatives:
