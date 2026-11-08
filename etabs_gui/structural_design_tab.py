@@ -126,7 +126,9 @@ class StructuralDesignTab(ttk.Frame):
             self.nodes.insert("", "end", values=(node.id, f"{node.x:.2f}", f"{node.y:.2f}", f"{node.score:.0f}"))
         for beam in self.proposal.beams:
             self.members.insert("", "end", values=(beam.id, f"{beam.length:.2f}",
-                                                     f"{beam.width_cm}×{beam.depth_cm} cm", f"Viga {beam.direction}"))
+                                                     (f"{beam.width_cm}×{beam.depth_cm} cm"
+                                                      if beam.width_cm else "Pendiente de E.070 / definición"),
+                                                     f"Viga {beam.direction}"))
         for slab in self.proposal.slabs:
             self.members.insert("", "end", values=(slab.id, f"{slab.area:.2f} m²",
                                                      f"{slab.width:.2f}×{slab.length:.2f} m",
