@@ -91,30 +91,40 @@ def compare_segments(a: Segment, b: Segment, tolerance: float = 0.15,
 def compare_floors(lower: FloorDrawing, upper: FloorDrawing,
                    tolerance: float = 0.15, angle_tolerance: float = 5.0,
                    full_ratio: float = 0.85) -> list[ContinuityMatch]:
-    """Match each upper-floor segment to its best lower-floor counterpart."""
-    matches: list[ContinuityMatch] = []
+    """Match segments one-to-one, preferring the greatest geometric overlap."""
+    candidates = []
     for upper_index, upper_segment in enumerate(upper.segments):
-        best = None
         for lower_index, lower_segment in enumerate(lower.segments):
             ratio, offset, angle = compare_segments(
                 upper_segment, lower_segment, tolerance, angle_tolerance)
-            if best is None or ratio > best[0]:
-                best = (ratio, offset, angle, lower_index)
-        if best is None or best[0] <= 0:
+            if ratio > 0:
+                candidates.append((ratio, upper_index, lower_index, offset, angle))
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    assigned_upper: dict[int, tuple[int, float, float, float]] = {}
+    assigned_lower: set[int] = set()
+    for ratio, upper_index, lower_index, offset, angle in candidates:
+        if upper_index in assigned_upper or lower_index in assigned_lower:
+            continue
+        assigned_upper[upper_index] = (lower_index, ratio, offset, angle)
+        assigned_lower.add(lower_index)
+
+    matches: list[ContinuityMatch] = []
+    for upper_index in range(len(upper.segments)):
+        if upper_index not in assigned_upper:
             matches.append(ContinuityMatch(upper_index, -1, "appears", 0.0,
                                            math.inf, 180.0))
-        else:
-            ratio, offset, angle, lower_index = best
-            status = "continuous" if ratio >= full_ratio else "partial"
-            matches.append(ContinuityMatch(upper_index, lower_index, status,
-                                           ratio, offset, angle))
-    matched_lower = {m.lower_index for m in matches if m.lower_index >= 0}
+            continue
+        lower_index, ratio, offset, angle = assigned_upper[upper_index]
+        status = "continuous" if ratio >= full_ratio else "partial"
+        matches.append(ContinuityMatch(upper_index, lower_index, status,
+                                       ratio, offset, angle))
+
     for lower_index in range(len(lower.segments)):
-        if lower_index not in matched_lower:
+        if lower_index not in assigned_lower:
             matches.append(ContinuityMatch(-1, lower_index, "disappears",
                                            0.0, math.inf, 180.0))
     return matches
-
 
 def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
              include_layers: Iterable[str] | None = None) -> FloorDrawing:
