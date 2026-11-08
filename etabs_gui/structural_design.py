@@ -83,15 +83,31 @@ def _intersection(a: Segment, b: Segment, tol: float = 1e-8):
 
 
 def _cluster_points(points, tolerance: float):
-    clusters: list[list] = []
-    for x, y, reason, layer in points:
-        for cluster in clusters:
-            if _distance((x, y), (cluster[0][0], cluster[0][1])) <= tolerance:
-                cluster.append((x, y, reason, layer))
-                break
-        else:
-            clusters.append([(x, y, reason, layer)])
-    return clusters
+    """Group coincident points transitively, independent of input ordering."""
+    points = list(points)
+    parent = list(range(len(points)))
+
+    def find(index):
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    def union(first, second):
+        root_a, root_b = find(first), find(second)
+        if root_a != root_b:
+            parent[root_b] = root_a
+
+    for index, (x, y, _reason, _layer) in enumerate(points):
+        for other in range(index):
+            ox, oy, _other_reason, _other_layer = points[other]
+            if _distance((x, y), (ox, oy)) <= tolerance:
+                union(index, other)
+
+    grouped = {}
+    for index, point in enumerate(points):
+        grouped.setdefault(find(index), []).append(point)
+    return list(grouped.values())
 
 
 def _round_section(value: float, minimum: int = 25) -> int:
