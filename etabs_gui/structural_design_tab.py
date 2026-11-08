@@ -224,6 +224,8 @@ class StructuralDesignTab(ttk.Frame):
                           for v, w in ((s.x1, s.y1), (s.x2, s.y2)))
         if self.proposal:
             points.extend((n.x, n.y) for n in self.proposal.nodes)
+            points.extend((v, w) for s in self.proposal.grid_lines
+                          for v, w in ((s.x1, s.y1), (s.x2, s.y2)))
         if not points:
             self._redraw()
             return
@@ -302,6 +304,12 @@ class StructuralDesignTab(ttk.Frame):
                 canvas.create_line(x1, y1, x2, y2, fill="#c4cbd4", width=1)
 
         if self.proposal:
+            # DXF grid/axis lines are displayed as a separate guide layer.
+            for guide in self.proposal.grid_lines:
+                gx1, gy1 = screen(guide.x1, guide.y1)
+                gx2, gy2 = screen(guide.x2, guide.y2)
+                canvas.create_line(gx1, gy1, gx2, gy2, fill="#2b9ca3",
+                                   width=1, dash=(8, 5))
             by_id = {node.id: node for node in self.proposal.nodes}
             selected = self._selected_ids or set(by_id)
             for beam in self.proposal.beams:
@@ -323,9 +331,20 @@ class StructuralDesignTab(ttk.Frame):
                 color = "#d04444" if is_selected else "#d89a35"
                 canvas.create_oval(x-radius, y-radius, x+radius, y+radius,
                                    fill=color, outline="white", width=1)
-                canvas.create_text(x+9, y-9, text=node.id, anchor="sw",
-                                   fill="#7a3e16" if is_selected else "#64748b",
-                                   font=("Segoe UI", 8, "bold" if is_selected else "normal"))
+                # Draw a visible preliminary column section, not just a point marker.
+                section_cm = self.proposal.metrics.get("reference_column_cm")
+                if is_selected and section_cm:
+                    half = max(4.0, (section_cm / 100.0) * scale / 2.0)
+                    canvas.create_rectangle(x-half, y-half, x+half, y+half,
+                                            fill="#e9a2a2", outline="#a52a2a", width=2)
+                    canvas.create_text(x+half+4, y-half-3,
+                                       text=f"{node.id} · {section_cm}×{section_cm}",
+                                       anchor="sw", fill="#7a2020",
+                                       font=("Segoe UI", 8, "bold"))
+                else:
+                    canvas.create_text(x+9, y-9, text=node.id, anchor="sw",
+                                       fill="#7a3e16" if is_selected else "#64748b",
+                                       font=("Segoe UI", 8, "bold" if is_selected else "normal"))
 
         canvas.create_text(12, 10, anchor="nw",
                            text=(f"{drawing.name if drawing else 'Sin DXF'} · "
