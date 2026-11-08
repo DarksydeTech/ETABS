@@ -897,8 +897,9 @@ class EtabsApp(tk.Tk):
     def refresh_all(self) -> None:
         self._loading = True
         project = self.project
-        if (hasattr(self, "structural_design_tab")
-                and self.structural_design_tab.project is not project):
+        if hasattr(self, "structural_design_tab"):
+            # Keep the structural proposal bound to the active Project instance
+            # after New/Open/Excel import, and synchronize floor count after edits.
             self.structural_design_tab.project = project
             self.structural_design_tab.floor.set(str(max(1, len(project.stories))))
         project.refresh_section_properties()
