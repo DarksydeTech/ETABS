@@ -1136,9 +1136,12 @@ la trazabilidad entre DXF, nivel y elemento estructural.
 
 ### 18.4 Archivos
 
-- `etabs_gui/structural_design.py`: motor geométrico, estimaciones y alternativas.
-- `etabs_gui/structural_design_tab.py`: interfaz de la pestaña 9.
-- `tests/test_structural_design.py`: pruebas unitarias del motor.
+- `etabs_gui/structural_design.py`: motor geométrico, estimaciones y alternativas. La agrupación de nodos es transitiva para evitar candidatos duplicados por cadenas de puntos próximos.
+- `etabs_gui/structural_design_tab.py`: interfaz de la pestaña 9; presenta los criterios y advertencias emitidos por el motor.
+- `etabs_gui/app.py`: mantiene la pestaña 9 enlazada con la instancia activa de `Project` después de Nuevo/Abrir/Importar y sincroniza la cantidad de pisos.
+- `tests/test_structural_design.py`: pruebas unitarias del motor, incluida la agrupación transitiva.
+
+La propuesta reutiliza el DXF y la clasificación semántica de la pestaña 8; la cantidad de pisos procede del proyecto activo. **La conexión actual llega al análisis y visualización de candidatos, no a la sustitución automática de `Project.plan` ni a la exportación directa de la alternativa a ETABS.** Esa transferencia requiere aprobación explícita y asignación de secciones existentes; no se debe presentar como implementada.
 
 ## Anexo A · Árbol del repositorio
 
