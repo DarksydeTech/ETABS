@@ -4,19 +4,22 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .architectural import (FloorDrawing, alignment_offsets_by_bounds,
-                            apply_alignment_offsets, compare_floors, read_dxf)
+from .architectural import (CATEGORY_LABELS, FloorDrawing, alignment_offsets_by_bounds,
+                            apply_alignment_offsets, compare_floors,
+                            default_layer_category, read_dxf)
 
 
 class ArchitecturalTab(ttk.Frame):
     COLORS = {"continuous": "#23934b", "partial": "#d49b16",
-              "appears": "#2878c8", "disappears": "#c83b35"}
+              "appears": "#2878c8", "disappears": "#c83b35",
+              "review": "#8b5cf6", "excluded": "#94a3b8"}
 
     def __init__(self, master):
         super().__init__(master, padding=8)
         self.drawings: list[FloorDrawing] = []
         self.matches = []
         self.comparisons = []
+        self.layer_categories: dict[str, str] = {}
         self._build()
 
     def _build(self):
@@ -26,6 +29,8 @@ class ArchitecturalTab(ttk.Frame):
                    command=self.import_dxf).pack(side="left")
         ttk.Button(toolbar, text="Alinear por centro de extensión",
                    command=self.align).pack(side="left", padx=5)
+        ttk.Button(toolbar, text="Clasificar capas…",
+                   command=self.configure_layers).pack(side="left", padx=5)
         ttk.Button(toolbar, text="Comparar niveles",
                    command=self.compare).pack(side="left")
         self.summary = tk.StringVar(value="Importa un archivo DXF por cada nivel para comenzar.")
@@ -71,7 +76,8 @@ class ArchitecturalTab(ttk.Frame):
         legend = ttk.Frame(right)
         legend.pack(fill="x", pady=(5, 0))
         for key, label in (("continuous", "Continuidad"), ("partial", "Parcial"),
-                           ("appears", "Aparece"), ("disappears", "Desaparece")):
+                           ("appears", "Aparece"), ("disappears", "Desaparece"),
+                           ("review", "Revisar categoría"), ("excluded", "Excluido")):
             chip = tk.Label(legend, text=f"  {label}  ", fg=self.COLORS[key],
                             relief="groove", padx=3, pady=2)
             chip.pack(side="left", padx=(0, 5))
@@ -98,6 +104,8 @@ class ArchitecturalTab(ttk.Frame):
             messagebox.showerror("Nivel repetido", "Ya existe un nivel con ese nombre.", parent=self)
             return
         self.drawings.append(drawing)
+        for layer in drawing.layers:
+            self.layer_categories.setdefault(layer, default_layer_category(layer))
         self.matches = []
         self.comparisons = []
         self.pair_selector["values"] = ()
@@ -142,13 +150,69 @@ class ArchitecturalTab(ttk.Frame):
         self.summary.set("Alineación aplicada por centro de extensión. Vuelve a comparar los niveles.")
         self.redraw()
 
+
+    def configure_layers(self):
+        layers = sorted({layer for drawing in self.drawings for layer in drawing.layers},
+                        key=str.casefold)
+        if not layers:
+            messagebox.showinfo("Clasificar capas", "Primero importa uno o más DXF.", parent=self)
+            return
+        window = tk.Toplevel(self)
+        window.title("Clasificación semántica de capas DXF")
+        window.transient(self.winfo_toplevel())
+        window.geometry("590x560")
+        ttk.Label(window,
+                  text="Asigna a cada capa su función. Solo se comparan como continuidad "
+                       "las categorías constructivas compatibles.",
+                  wraplength=550).pack(anchor="w", padx=12, pady=10)
+        holder = ttk.Frame(window)
+        holder.pack(fill="both", expand=True, padx=12)
+        canvas = tk.Canvas(holder, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(holder, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas)
+        inner.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        ttk.Label(inner, text="Capa DXF", font=("Segoe UI", 9, "bold")).grid(
+            row=0, column=0, sticky="w", padx=5, pady=4)
+        ttk.Label(inner, text="Categoría", font=("Segoe UI", 9, "bold")).grid(
+            row=0, column=1, sticky="w", padx=5, pady=4)
+        variables = {}
+        for row, layer in enumerate(layers, start=1):
+            ttk.Label(inner, text=layer).grid(row=row, column=0, sticky="w", padx=5, pady=3)
+            var = tk.StringVar(value=self.layer_categories.get(layer, default_layer_category(layer)))
+            combo = ttk.Combobox(inner, textvariable=var, state="readonly",
+                                 values=list(CATEGORY_LABELS.keys()), width=24)
+            combo.grid(row=row, column=1, sticky="ew", padx=5, pady=3)
+            variables[layer] = var
+        inner.columnconfigure(1, weight=1)
+
+        def save():
+            for layer, var in variables.items():
+                self.layer_categories[layer] = var.get()
+            self.matches = []
+            self.comparisons = []
+            self.pair_selector["values"] = ()
+            self.pair_var.set("")
+            self.summary.set("Clasificación guardada. Vuelve a comparar los niveles.")
+            self.redraw()
+            window.destroy()
+
+        buttons = ttk.Frame(window)
+        buttons.pack(fill="x", padx=12, pady=10)
+        ttk.Button(buttons, text="Guardar clasificación", command=save).pack(side="right")
+        ttk.Button(buttons, text="Cancelar", command=window.destroy).pack(side="right", padx=6)
+
     def compare(self):
         if len(self.drawings) < 2:
             messagebox.showinfo("Comparar", "Importa al menos dos niveles.", parent=self)
             return
         # Compare every consecutive pair, not only the last two imported floors.
         self.comparisons = [
-            (i, i + 1, compare_floors(self.drawings[i], self.drawings[i + 1]))
+            (i, i + 1, compare_floors(self.drawings[i], self.drawings[i + 1],
+                           layer_categories=self.layer_categories))
             for i in range(len(self.drawings) - 1)
         ]
         labels = [f"{self.drawings[lo].name} → {self.drawings[hi].name}"
@@ -163,11 +227,12 @@ class ArchitecturalTab(ttk.Frame):
             return
         lower_index, upper_index, self.matches = self.comparisons[selected]
         counts = {key: sum(m.status == key for m in self.matches)
-                  for key in ("continuous", "partial", "appears", "disappears")}
+                  for key in ("continuous", "partial", "appears", "disappears", "review", "excluded")}
         self.summary.set(
             f"{self.drawings[lower_index].name} → {self.drawings[upper_index].name}: "
             f"{counts['continuous']} continuos · {counts['partial']} parciales · "
-            f"{counts['appears']} aparecen · {counts['disappears']} desaparecen "
+            f"{counts['appears']} aparecen · {counts['disappears']} desaparecen · "
+            f"{counts['review']} por revisar · {counts['excluded']} excluidos "
             f"({len(self.comparisons)} pares analizados)")
         self.redraw()
 
