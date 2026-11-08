@@ -4,7 +4,8 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .architectural import (FloorDrawing, alignment_offsets_by_bounds,\n                            apply_alignment_offsets, compare_floors, read_dxf)
+from .architectural import (FloorDrawing, alignment_offsets_by_bounds,
+                            apply_alignment_offsets, compare_floors, read_dxf)
 
 
 class ArchitecturalTab(ttk.Frame):
@@ -116,8 +117,8 @@ class ArchitecturalTab(ttk.Frame):
             messagebox.showinfo("Alineación", "Los centros de las extensiones geométricas ya coinciden. No se modificó ningún plano.", parent=self)
             self.summary.set("Sin desplazamientos: los centros de extensión coinciden.")
             return
-        if not messagebox.askyesno("Confirmar alineación", "\\n".join(lines) +
-                                   "\\n\\n¿Aplicar estos desplazamientos? Esta operación modifica las coordenadas en memoria.", parent=self):
+        if not messagebox.askyesno("Confirmar alineación", "\n".join(lines) +
+                                   "\n\n¿Aplicar estos desplazamientos? Esta operación modifica las coordenadas en memoria.", parent=self):
             return
         apply_alignment_offsets(self.drawings, offsets)
         self.matches = []
