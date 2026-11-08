@@ -230,24 +230,51 @@ def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
                         ignored)
 
 
-def align_by_centroid(drawings: list[FloorDrawing]) -> None:
-    """Translate drawings to a shared centroid; does not rotate or scale them."""
+def alignment_offsets_by_bounds(drawings: list[FloorDrawing]) -> list[tuple[float, float]]:
+    """Calculate translations using each drawing's bounding-box center.
+
+    Unlike a vertex-average centroid, the bounding-box center is invariant to
+    whether the same geometry is encoded as one polyline or many segments.
+    The first drawing is the fixed reference and is never translated.
+    """
     if not drawings:
-        return
-    centroids = []
+        return []
+
+    centers: list[tuple[float, float]] = []
     for drawing in drawings:
-        points = [(s.x1, s.y1) for s in drawing.segments] + [
-            (s.x2, s.y2) for s in drawing.segments]
+        points = [(coordinate, ordinate)
+                  for segment in drawing.segments
+                  for coordinate, ordinate in ((segment.x1, segment.y1),
+                                               (segment.x2, segment.y2))]
         if not points:
-            centroids.append((0.0, 0.0))
-        else:
-            centroids.append((sum(p[0] for p in points) / len(points),
-                              sum(p[1] for p in points) / len(points)))
-    target = centroids[0]
-    for drawing, center in zip(drawings, centroids):
-        dx, dy = target[0] - center[0], target[1] - center[1]
+            centers.append((0.0, 0.0))
+            continue
+        min_x = min(point[0] for point in points)
+        max_x = max(point[0] for point in points)
+        min_y = min(point[1] for point in points)
+        max_y = max(point[1] for point in points)
+        centers.append(((min_x + max_x) / 2, (min_y + max_y) / 2))
+
+    reference_x, reference_y = centers[0]
+    return [(reference_x - center_x, reference_y - center_y)
+            for center_x, center_y in centers]
+
+
+def apply_alignment_offsets(drawings: list[FloorDrawing],
+                            offsets: list[tuple[float, float]]) -> None:
+    """Apply previously reviewed translations to drawings in place."""
+    if len(drawings) != len(offsets):
+        raise ValueError("La cantidad de desplazamientos no coincide con los niveles.")
+    for drawing, (dx, dy) in zip(drawings, offsets):
         if abs(dx) < 1e-9 and abs(dy) < 1e-9:
             continue
-        drawing.segments = [Segment(s.layer, s.x1 + dx, s.y1 + dy,
-                                    s.x2 + dx, s.y2 + dy, s.entity_type)
-                            for s in drawing.segments]
+        drawing.segments = [
+            Segment(s.layer, s.x1 + dx, s.y1 + dy,
+                    s.x2 + dx, s.y2 + dy, s.entity_type)
+            for s in drawing.segments
+        ]
+
+
+def align_by_centroid(drawings: list[FloorDrawing]) -> None:
+    """Compatibility wrapper: align by bounding-box center, not vertex centroid."""
+    apply_alignment_offsets(drawings, alignment_offsets_by_bounds(drawings))
