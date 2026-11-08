@@ -183,23 +183,35 @@ def generate_proposal(
                                            first.id, second.id, length, direction, width, depth))
 
     slabs = []
+    # Un paño requiere vigas candidatas en sus cuatro lados; cuatro puntos
+    # aislados no bastan para inferir una losa.
+    edge_set = {frozenset((beam.start, beam.end)) for beam in beams}
     xs = sorted({round(n.x, 3) for n in nodes})
     ys = sorted({round(n.y, 3) for n in nodes})
-    node_lookup = {(round(n.x, 3), round(n.y, 3)): n for n in nodes}
+
+    def corner_node(x, y):
+        return next((n for n in nodes if _distance((x, y), (n.x, n.y)) <= tolerance), None)
+
     for x0, x1 in zip(xs, xs[1:]):
         for y0, y1 in zip(ys, ys[1:]):
             if (x1-x0) <= tolerance or (y1-y0) <= tolerance:
                 continue
-            corners = [(x0,y0),(x1,y0),(x1,y1),(x0,y1)]
-            if all(any(_distance(c, (n.x,n.y)) <= tolerance for n in nodes) for c in corners):
-                short, long = sorted((x1-x0, y1-y0))
-                ratio = long / short
-                slabs.append(SlabPanel(f"L-{len(slabs)+1:03d}", short, long,
-                                       short*long, ratio,
-                                       "Unidireccional (candidato)" if ratio >= 2.0
-                                       else "Bidireccional (candidato)",
-                                       "Dirección de luz corta" if ratio >= 2.0
-                                       else "Revisar apoyos y continuidad"))
+            corners = [corner_node(x0,y0), corner_node(x1,y0),
+                       corner_node(x1,y1), corner_node(x0,y1)]
+            if any(node is None for node in corners):
+                continue
+            ids = [node.id for node in corners]
+            if not all(frozenset((ids[i], ids[(i+1) % 4])) in edge_set
+                       for i in range(4)):
+                continue
+            short, long = sorted((x1-x0, y1-y0))
+            ratio = long / short
+            slabs.append(SlabPanel(f"L-{len(slabs)+1:03d}", short, long,
+                                   short*long, ratio,
+                                   "Unidireccional (candidato)" if ratio >= 2.0
+                                   else "Bidireccional (candidato)",
+                                   "Dirección de luz corta" if ratio >= 2.0
+                                   else "Revisar apoyos y continuidad"))
 
     if not structural_lines:
         notes = ["No se identificaron capas clasificadas como muro o columna.",
