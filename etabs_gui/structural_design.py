@@ -125,7 +125,7 @@ def generate_proposal(
     def category(segment):
         return categories.get(segment.layer, _default_category(segment.layer))
 
-    walls = [s for s in drawing.segments if category(s) in {"wall", "low_wall"}]
+    walls = [s for s in drawing.segments if category(s) == "wall"]
     explicit_columns = [s for s in drawing.segments if category(s) == "column"]
     structural_lines = walls + explicit_columns
     points = []
