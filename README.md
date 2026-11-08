@@ -115,3 +115,26 @@ Las líneas de grilla se escriben como líneas generales con extremos explícito
 ETABS recorta las líneas cartesianas al rectángulo X/Y y no las prolonga hasta
 las grillas inclinadas; con extremos explícitos las líneas numeradas llegan
 hasta la grilla inclinada, igual que en el lienzo.
+
+
+## Analizador de continuidad arquitectónica (DXF)
+
+La pestaña **8 · Continuidad arquitectónica** permite importar un archivo DXF
+por nivel, conservar la capa de origen y comparar los segmentos lineales entre
+dos plantas consecutivas. Reconoce entidades LINE, LWPOLYLINE, POLYLINE, ARC,
+CIRCLE e INSERT (bloques); los arcos y círculos se discretizan en segmentos.
+Incluye superposición gráfica, alineación inicial por centroide y clasificación
+geométrica de trazos continuos, parciales, que aparecen o desaparecen.
+
+Instalación de la dependencia adicional:
+
+```powershell
+py -m pip install -r requirements.txt
+```
+
+**Importante:** la comparación es geométrica y preliminar. La alineación por
+centroide solo corrige traslaciones; no rota ni escala planos. Las unidades DXF
+se conservan como unidades de dibujo y deben coincidir entre niveles. La
+continuidad arquitectónica no demuestra que un muro sea estructural ni valida
+su capacidad, detallado o cumplimiento de la E.030/E.060. Antes de usar los
+resultados en el modelo ETABS, verifica capas, escala, orientación y geometría.
