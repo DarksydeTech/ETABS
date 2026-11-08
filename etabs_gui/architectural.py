@@ -88,42 +88,59 @@ def compare_segments(a: Segment, b: Segment, tolerance: float = 0.15,
     return min(1.0, ratio), offset, angle
 
 
+def _segment_coverage(target: Segment, candidates: list[Segment],
+                      tolerance: float, angle_tolerance: float) -> tuple[float, int, float, float]:
+    """Fraction of target length covered by the union of collinear candidates."""
+    if target.length <= 1e-9:
+        return 0.0, -1, math.inf, 180.0
+    ux = (target.x2 - target.x1) / target.length
+    uy = (target.y2 - target.y1) / target.length
+    intervals: list[tuple[float, float]] = []
+    best_index, best_offset, best_angle, best_overlap = -1, math.inf, 180.0, 0.0
+    for index, candidate in enumerate(candidates):
+        if candidate.length <= 1e-9:
+            continue
+        angle = _angle_difference(target, candidate)
+        offset = (_distance_point_line(candidate.x1, candidate.y1, target.x1, target.y1, ux, uy) +
+                  _distance_point_line(candidate.x2, candidate.y2, target.x1, target.y1, ux, uy)) / 2
+        if angle > angle_tolerance or offset > tolerance:
+            continue
+        p0, p1 = _segment_projection(candidate, target.x1, target.y1, ux, uy)
+        lo, hi = max(0.0, p0), min(target.length, p1)
+        overlap = max(0.0, hi - lo)
+        if overlap <= 1e-9:
+            continue
+        intervals.append((lo, hi))
+        if overlap > best_overlap:
+            best_index, best_offset, best_angle, best_overlap = index, offset, angle, overlap
+    if not intervals:
+        return 0.0, -1, math.inf, 180.0
+    intervals.sort()
+    covered = 0.0
+    current_start, current_end = intervals[0]
+    for lo, hi in intervals[1:]:
+        if lo <= current_end:
+            current_end = max(current_end, hi)
+        else:
+            covered += current_end - current_start
+            current_start, current_end = lo, hi
+    covered += current_end - current_start
+    return min(1.0, covered / target.length), best_index, best_offset, best_angle
+
+
 def compare_floors(lower: FloorDrawing, upper: FloorDrawing,
                    tolerance: float = 0.15, angle_tolerance: float = 5.0,
                    full_ratio: float = 0.85) -> list[ContinuityMatch]:
-    """Match segments one-to-one, preferring the greatest geometric overlap."""
-    candidates = []
-    for upper_index, upper_segment in enumerate(upper.segments):
-        for lower_index, lower_segment in enumerate(lower.segments):
-            ratio, offset, angle = compare_segments(
-                upper_segment, lower_segment, tolerance, angle_tolerance)
-            if ratio > 0:
-                candidates.append((ratio, upper_index, lower_index, offset, angle))
-
-    candidates.sort(key=lambda item: item[0], reverse=True)
-    assigned_upper: dict[int, tuple[int, float, float, float]] = {}
-    assigned_lower: set[int] = set()
-    for ratio, upper_index, lower_index, offset, angle in candidates:
-        if upper_index in assigned_upper or lower_index in assigned_lower:
-            continue
-        assigned_upper[upper_index] = (lower_index, ratio, offset, angle)
-        assigned_lower.add(lower_index)
-
+    """Compare both drawings by geometric coverage, allowing split/merged segments."""
     matches: list[ContinuityMatch] = []
-    for upper_index in range(len(upper.segments)):
-        if upper_index not in assigned_upper:
-            matches.append(ContinuityMatch(upper_index, -1, "appears", 0.0,
-                                           math.inf, 180.0))
-            continue
-        lower_index, ratio, offset, angle = assigned_upper[upper_index]
-        status = "continuous" if ratio >= full_ratio else "partial"
-        matches.append(ContinuityMatch(upper_index, lower_index, status,
-                                       ratio, offset, angle))
-
-    for lower_index in range(len(lower.segments)):
-        if lower_index not in assigned_lower:
-            matches.append(ContinuityMatch(-1, lower_index, "disappears",
-                                           0.0, math.inf, 180.0))
+    for upper_index, segment in enumerate(upper.segments):
+        ratio, lower_index, offset, angle = _segment_coverage(segment, lower.segments, tolerance, angle_tolerance)
+        status = "continuous" if ratio >= full_ratio else "partial" if ratio > 1e-9 else "appears"
+        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle))
+    for lower_index, segment in enumerate(lower.segments):
+        ratio, upper_index, offset, angle = _segment_coverage(segment, upper.segments, tolerance, angle_tolerance)
+        status = "continuous" if ratio >= full_ratio else "partial" if ratio > 1e-9 else "disappears"
+        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle))
     return matches
 
 def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
