@@ -4,7 +4,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
-from .architectural import FloorDrawing, align_by_centroid, compare_floors, read_dxf
+from .architectural import (FloorDrawing, alignment_offsets_by_bounds,\n                            apply_alignment_offsets, compare_floors, read_dxf)
 
 
 class ArchitecturalTab(ttk.Frame):
@@ -22,7 +22,7 @@ class ArchitecturalTab(ttk.Frame):
         toolbar.pack(fill="x", pady=(0, 8))
         ttk.Button(toolbar, text="Importar DXF de nivel…",
                    command=self.import_dxf).pack(side="left")
-        ttk.Button(toolbar, text="Alinear por centroide",
+        ttk.Button(toolbar, text="Alinear por centro de extensión",
                    command=self.align).pack(side="left", padx=5)
         ttk.Button(toolbar, text="Comparar niveles",
                    command=self.compare).pack(side="left")
@@ -108,9 +108,20 @@ class ArchitecturalTab(ttk.Frame):
         if len(self.drawings) < 2:
             messagebox.showinfo("Alinear", "Importa al menos dos niveles.", parent=self)
             return
-        align_by_centroid(self.drawings)
+        offsets = alignment_offsets_by_bounds(self.drawings)
+        lines = ["Desplazamientos propuestos respecto al primer nivel (unidades DXF):", ""]
+        for drawing, (dx, dy) in zip(self.drawings, offsets):
+            lines.append(f"{drawing.name}: ΔX = {dx:.4f} · ΔY = {dy:.4f}")
+        if all(abs(dx) < 1e-9 and abs(dy) < 1e-9 for dx, dy in offsets):
+            messagebox.showinfo("Alineación", "Los centros de las extensiones geométricas ya coinciden. No se modificó ningún plano.", parent=self)
+            self.summary.set("Sin desplazamientos: los centros de extensión coinciden.")
+            return
+        if not messagebox.askyesno("Confirmar alineación", "\\n".join(lines) +
+                                   "\\n\\n¿Aplicar estos desplazamientos? Esta operación modifica las coordenadas en memoria.", parent=self):
+            return
+        apply_alignment_offsets(self.drawings, offsets)
         self.matches = []
-        self.summary.set("Niveles trasladados para hacer coincidir sus centroides geométricos. Revisa la superposición.")
+        self.summary.set("Alineación aplicada por centro de extensión. Vuelve a comparar los niveles.")
         self.redraw()
 
     def compare(self):
