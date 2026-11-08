@@ -51,6 +51,7 @@ class StructuralProposal:
     slabs: list[SlabPanel] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
+    grid_lines: list[Segment] = field(default_factory=list)
 
 
 SYSTEMS = (
@@ -63,6 +64,17 @@ SYSTEMS = (
 
 def _distance(a: tuple[float, float], b: tuple[float, float]) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def _point_segment_distance(point, segment: Segment) -> float:
+    dx, dy = segment.x2 - segment.x1, segment.y2 - segment.y1
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 1e-12:
+        return _distance(point, (segment.x1, segment.y1))
+    t = max(0.0, min(1.0, ((point[0] - segment.x1) * dx +
+                          (point[1] - segment.y1) * dy) / length_sq))
+    projection = (segment.x1 + t * dx, segment.y1 + t * dy)
+    return _distance(point, projection)
 
 
 def _intersection(a: Segment, b: Segment, tol: float = 1e-8):
@@ -144,7 +156,11 @@ def generate_proposal(
 
     walls = [s for s in drawing.segments if category(s) == "wall"]
     explicit_columns = [s for s in drawing.segments if category(s) == "column"]
+    grid_source = [s for s in drawing.segments if category(s) == "grid"]
     structural_lines = walls + explicit_columns
+    grid_lines = [Segment(s.layer, s.x1 * unit_scale, s.y1 * unit_scale,
+                          s.x2 * unit_scale, s.y2 * unit_scale, s.entity_type)
+                  for s in grid_source]
     points = []
     for segment in structural_lines:
         x1, y1 = segment.x1 * unit_scale, segment.y1 * unit_scale
@@ -161,6 +177,19 @@ def generate_proposal(
                 points.append((point[0]*unit_scale, point[1]*unit_scale,
                                "Intersección de elementos", second.layer))
 
+    # Intersections of DXF axes are candidate references only when supported
+    # by a wall or an explicit column line; grid crossings alone are not columns.
+    for i, first in enumerate(grid_lines):
+        for second in grid_lines[i + 1:]:
+            crossing = _intersection(first, second)
+            if crossing is None:
+                continue
+            supported = any(_point_segment_distance(crossing, wall) <= max(tolerance * 1.5, 0.20)
+                            for wall in structural_lines)
+            if supported:
+                points.append((crossing[0], crossing[1], "Intersección de ejes",
+                               f"{first.layer} / {second.layer}"))
+
     clusters = _cluster_points(points, tolerance)
     nodes = []
     for index, cluster in enumerate(clusters, start=1):
@@ -169,6 +198,7 @@ def generate_proposal(
         reasons = tuple(sorted({p[2] for p in cluster}))
         layers = tuple(sorted({p[3] for p in cluster}))
         score = min(100.0, 45.0 + 20.0 * ("Intersección de elementos" in reasons)
+                    + 20.0 * ("Intersección de ejes" in reasons)
                     + min(20.0, len(layers)*5.0) + min(15.0, len(cluster)*2.0))
         nodes.append(StructuralNode(f"CAND-{index:03d}", x, y, score, reasons, layers))
 
@@ -269,13 +299,18 @@ def generate_proposal(
     if not nodes:
         notes.append("No se generaron candidatos. Revisa las capas asignadas y la escala del DXF.")
 
+    if not grid_lines:
+        notes.append("No se detectaron capas de ejes/grillas. Clasifica las capas guía del DXF para incorporarlas como referencias geométricas.")
+    else:
+        notes.append(f"Se detectaron {len(grid_lines)} segmentos de ejes/grillas; sus cruces solo se promueven a candidatos cuando tienen proximidad a líneas estructurales.")
+
     return StructuralProposal(system, nodes, beams, slabs, notes, {
         "candidate_columns": len(nodes), "candidate_beams": len(beams),
         "candidate_slabs": len(slabs), "stories": stories, "fc": fc,
         "reference_column_cm": column_side,
         "unit_scale_to_m": unit_scale,
         "dead_load_kN_m2": dead_load, "live_load_kN_m2": live_load,
-    })
+    }, grid_lines=grid_lines)
 
 
 def _default_category(layer: str) -> str:
