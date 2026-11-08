@@ -98,6 +98,10 @@ class ArchitecturalTab(ttk.Frame):
             messagebox.showerror("Nivel repetido", "Ya existe un nivel con ese nombre.", parent=self)
             return
         self.drawings.append(drawing)
+        self.matches = []
+        self.comparisons = []
+        self.pair_selector["values"] = ()
+        self.pair_var.set("")
         self._refresh_levels()
         self.summary.set(f"{len(self.drawings)} nivel(es) · {len(drawing.segments)} segmentos en {drawing.name}")
         self.redraw()
@@ -109,6 +113,9 @@ class ArchitecturalTab(ttk.Frame):
         index = int(selected[0])
         self.drawings.pop(index)
         self.matches = []
+        self.comparisons = []
+        self.pair_selector["values"] = ()
+        self.pair_var.set("")
         self._refresh_levels()
         self.redraw()
 
@@ -129,6 +136,9 @@ class ArchitecturalTab(ttk.Frame):
             return
         apply_alignment_offsets(self.drawings, offsets)
         self.matches = []
+        self.comparisons = []
+        self.pair_selector["values"] = ()
+        self.pair_var.set("")
         self.summary.set("Alineación aplicada por centro de extensión. Vuelve a comparar los niveles.")
         self.redraw()
 
@@ -179,11 +189,16 @@ class ArchitecturalTab(ttk.Frame):
                                fill="#64748b")
             return
         selected = self.view_mode.get()
+        selected_pair = self.pair_selector.current() if hasattr(self, "pair_selector") else -1
+        if selected_pair >= 0 and selected_pair < len(self.comparisons):
+            lower_index, upper_index, _ = self.comparisons[selected_pair]
+        else:
+            lower_index, upper_index = max(0, len(self.drawings) - 2), len(self.drawings) - 1
         if len(self.drawings) == 1 or selected == "Nivel inferior":
-            drawing = self.drawings[-2] if len(self.drawings) > 1 and selected == "Nivel inferior" else self.drawings[-1]
+            drawing = self.drawings[lower_index] if len(self.drawings) > 1 else self.drawings[-1]
             segments = [(s, "#64748b", 1) for s in drawing.segments]
         elif selected == "Nivel superior":
-            drawing = self.drawings[-1]
+            drawing = self.drawings[upper_index]
             segments = [(s, "#2878c8", 1) for s in drawing.segments]
         elif self.matches and len(self.drawings) >= 2:
             selected_pair = self.pair_selector.current()
@@ -194,10 +209,10 @@ class ArchitecturalTab(ttk.Frame):
             lower, upper = self.drawings[lower_index], self.drawings[upper_index]
             segments = []
             for match in self.matches:
-                if match.lower_index >= 0:
+                if match.side == "lower" and match.lower_index >= 0:
                     s = lower.segments[match.lower_index]
                     segments.append((s, self.COLORS[match.status], 3 if match.status == "continuous" else 2))
-                if match.upper_index >= 0:
+                elif match.side == "upper" and match.upper_index >= 0:
                     s = upper.segments[match.upper_index]
                     segments.append((s, self.COLORS[match.status], 3 if match.status == "continuous" else 2))
         else:
