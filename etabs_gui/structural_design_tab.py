@@ -30,7 +30,7 @@ class StructuralDesignTab(ttk.Frame):
         self.live = tk.StringVar(value="2")
         self.tolerance = tk.StringVar(value="0.15")
         self.max_span = tk.StringVar(value="7")
-        self.floor = tk.StringVar(value=str(max(1, len(project.stories))))
+        self.floor = tk.StringVar(value=str(max(1, len(self.project.stories))))
         fields = [
             ("Sistema", self.system, SYSTEMS, 38),
             ("Unidad DXF", self.units, ("m", "cm", "mm"), 7),
