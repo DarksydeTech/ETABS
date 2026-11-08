@@ -136,14 +136,29 @@ class ArchitecturalTab(ttk.Frame):
         if len(self.drawings) < 2:
             messagebox.showinfo("Comparar", "Importa al menos dos niveles.", parent=self)
             return
-        lower, upper = self.drawings[-2], self.drawings[-1]
-        self.matches = compare_floors(lower, upper)
+        # Compare every consecutive pair, not only the last two imported floors.
+        self.comparisons = [
+            (i, i + 1, compare_floors(self.drawings[i], self.drawings[i + 1]))
+            for i in range(len(self.drawings) - 1)
+        ]
+        labels = [f"{self.drawings[lo].name} → {self.drawings[hi].name}"
+                  for lo, hi, _matches in self.comparisons]
+        self.pair_selector["values"] = labels
+        self.pair_selector.current(len(labels) - 1)
+        self.select_pair()
+
+    def select_pair(self, _event=None):
+        selected = self.pair_selector.current()
+        if selected < 0 or selected >= len(self.comparisons):
+            return
+        lower_index, upper_index, self.matches = self.comparisons[selected]
         counts = {key: sum(m.status == key for m in self.matches)
                   for key in ("continuous", "partial", "appears", "disappears")}
         self.summary.set(
-            f"{lower.name} → {upper.name}: {counts['continuous']} continuos · "
-            f"{counts['partial']} parciales · {counts['appears']} aparecen · "
-            f"{counts['disappears']} desaparecen")
+            f"{self.drawings[lower_index].name} → {self.drawings[upper_index].name}: "
+            f"{counts['continuous']} continuos · {counts['partial']} parciales · "
+            f"{counts['appears']} aparecen · {counts['disappears']} desaparecen "
+            f"({len(self.comparisons)} pares analizados)")
         self.redraw()
 
     def _refresh_levels(self):
@@ -171,7 +186,12 @@ class ArchitecturalTab(ttk.Frame):
             drawing = self.drawings[-1]
             segments = [(s, "#2878c8", 1) for s in drawing.segments]
         elif self.matches and len(self.drawings) >= 2:
-            lower, upper = self.drawings[-2], self.drawings[-1]
+            selected_pair = self.pair_selector.current()
+            if selected_pair < 0 or selected_pair >= len(self.comparisons):
+                lower_index, upper_index = len(self.drawings) - 2, len(self.drawings) - 1
+            else:
+                lower_index, upper_index, _ = self.comparisons[selected_pair]
+            lower, upper = self.drawings[lower_index], self.drawings[upper_index]
             segments = []
             for match in self.matches:
                 if match.lower_index >= 0:
