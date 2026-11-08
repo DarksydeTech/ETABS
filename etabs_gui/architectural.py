@@ -134,6 +134,12 @@ def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
         raise RuntimeError(f"No se pudo leer el DXF '{source.name}': {exc}") from exc
 
     selected = {str(name).casefold() for name in include_layers} if include_layers else None
+
+    def auxiliary_layer(name: str) -> bool:
+        normalized = name.casefold().replace("_", "-").replace(" ", "-")
+        tokens = ("dim", "cota", "text", "annot", "mueble", "mobili",
+                  "furn", "hatch", "relleno", "trama", "puerta-mob")
+        return any(token in normalized for token in tokens)
     segments: list[Segment] = []
     layers: set[str] = set()
     ignored = 0
@@ -152,7 +158,7 @@ def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
         kind = entity.dxftype()
         layer = str(entity.dxf.get("layer", "0"))
         layers.add(layer)
-        if selected is not None and layer.casefold() not in selected:
+        if (selected is not None and layer.casefold() not in selected) or (selected is None and auxiliary_layer(layer)):
             ignored += 1
             return
         try:
