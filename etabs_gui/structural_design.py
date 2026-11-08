@@ -1,13 +1,12 @@
 """Generación preliminar de alternativas estructurales desde geometría DXF.
 
-Los resultados son candidatos editables para predimensionamiento, no diseño
+Los resultados son candidatos visibles y seleccionables para predimensionamiento, no diseño
 estructural ni comprobación normativa. Unidades geométricas normalizadas a m.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
-from typing import Iterable
 
 from .architectural import FloorDrawing, Segment
 
