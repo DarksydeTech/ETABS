@@ -55,7 +55,11 @@ class ContinuityMatch:
 
 LAYER_CATEGORY_DEFAULTS = {
     "muros": "wall", "muros-bajos": "low_wall", "wall": "wall",
-    "columnas": "column", "vigas vp": "primary_beam",
+    "columnas": "column", "ejes": "grid", "eje": "grid", "grilla": "grid",
+    "grillas": "grid", "guias": "grid", "guías": "grid", "grid": "grid",
+    "grids": "grid", "axis": "grid", "axes": "grid", "reticula": "grid",
+    "retícula": "grid", "lineas-guia": "grid", "líneas-guía": "grid",
+    "vigas vp": "primary_beam",
     "vigas vs": "secondary_beam", "escalera": "stair",
     "proyecciones": "projection", "planta": "plan_boundary",
     "plantas1": "plan_boundary", "plants": "plan_boundary",
@@ -77,12 +81,12 @@ CATEGORY_LABELS = {
     "column": "Columna", "primary_beam": "Viga principal",
     "secondary_beam": "Viga secundaria", "stair": "Escalera",
     "projection": "Proyección", "plan_boundary": "Límite de planta / área",
-    "reference": "Referencia / auxiliar", "hatch": "Achurado",
+    "grid": "Ejes / grillas / guías", "reference": "Referencia / auxiliar", "hatch": "Achurado",
     "annotation": "Texto / cota", "furniture": "Mobiliario",
     "opening": "Puerta / ventana / vano", "equipment": "Equipamiento",
     "detail": "Detalle", "unknown": "Sin clasificar",
 }
-EXCLUDED_CATEGORIES = {"projection", "plan_boundary", "reference", "hatch",
+EXCLUDED_CATEGORIES = {"projection", "plan_boundary", "grid", "reference", "hatch",
                        "annotation", "furniture", "opening", "equipment", "detail"}
 COMPARABLE_CATEGORIES = {"wall", "low_wall", "column", "primary_beam",
                          "secondary_beam", "stair"}
