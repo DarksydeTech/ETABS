@@ -69,6 +69,14 @@ class StructuralDesignTab(ttk.Frame):
         self.summary = tk.StringVar(value="Importa y clasifica al menos un DXF en la pestaña 8.")
         ttk.Label(actions, textvariable=self.summary).pack(side="left", padx=12)
 
+        notes_frame = ttk.LabelFrame(self, text="Criterios y advertencias de ingeniería", padding=5)
+        notes_frame.pack(fill="x", pady=(0, 8))
+        self.notes_text = tk.Text(notes_frame, height=4, wrap="word",
+                                  font=("Segoe UI", 8), relief="flat")
+        self.notes_text.pack(fill="x", expand=True)
+        self.notes_text.insert("1.0", "Genera una propuesta para consultar los criterios y las limitaciones.")
+        self.notes_text.configure(state="disabled")
+
         body = ttk.Panedwindow(self, orient="vertical")
         body.pack(fill="both", expand=True)
         top = ttk.Frame(body)
@@ -134,6 +142,10 @@ class StructuralDesignTab(ttk.Frame):
                                                      f"{slab.width:.2f}×{slab.length:.2f} m",
                                                      slab.behavior))
         self.summary.set(f"{len(self.proposal.nodes)} candidatos · {len(self.proposal.beams)} vigas · {len(self.proposal.slabs)} paños")
+        self.notes_text.configure(state="normal")
+        self.notes_text.delete("1.0", "end")
+        self.notes_text.insert("1.0", "\\n".join(f"• {note}" for note in self.proposal.notes))
+        self.notes_text.configure(state="disabled")
         self.alt_selector["values"] = [item["name"] for item in self.alternatives]
         if self.alternatives:
             self.alt_selector.current(0)
