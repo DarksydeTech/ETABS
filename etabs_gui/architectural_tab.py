@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from .architectural import FloorDrawing, align_by_centroid, compare_floors, read_dxf
 
@@ -74,7 +74,7 @@ class ArchitecturalTab(ttk.Frame):
             filetypes=[("Drawing Exchange Format", "*.dxf"), ("Todos", "*.*")])
         if not path:
             return
-        name = tk.simpledialog.askstring("Nombre del nivel", "Ej. Piso 1, Piso 2:")
+        name = simpledialog.askstring("Nombre del nivel", "Ej. Piso 1, Piso 2:")
         if name is None:
             return
         try:
