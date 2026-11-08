@@ -51,6 +51,46 @@ class ContinuityMatch:
     side: str = "upper"
 
 
+
+LAYER_CATEGORY_DEFAULTS = {
+    "muros": "wall", "muros-bajos": "low_wall", "wall": "wall",
+    "columnas": "column", "vigas vp": "primary_beam",
+    "vigas vs": "secondary_beam", "escalera": "stair",
+    "proyecciones": "projection", "planta": "plan_boundary",
+    "plantas1": "plan_boundary", "plants": "plan_boundary",
+    "casco": "plan_boundary", "a-trazo": "reference",
+    "achurado": "hatch", "textura": "hatch", "cotas": "annotation",
+    "a-textos": "annotation", "a-textos2": "annotation",
+    "a-titulos": "annotation", "texto-1": "annotation",
+    "textos2": "annotation", "textos4": "annotation",
+    "muebles": "furniture", "a_mueble": "furniture",
+    "puerta": "opening", "puertas": "opening",
+    "puertas-ventanas": "opening", "ventana": "opening", "vano": "opening",
+    "sanitarios": "equipment", "lavaderos": "equipment",
+    "electrodomesticos": "equipment", "est-fierros": "detail",
+    "nivel": "reference", "marco": "reference", "membrete": "reference",
+    "defpoints": "reference",
+}
+CATEGORY_LABELS = {
+    "wall": "Muro", "low_wall": "Muro bajo / parapeto",
+    "column": "Columna", "primary_beam": "Viga principal",
+    "secondary_beam": "Viga secundaria", "stair": "Escalera",
+    "projection": "Proyección", "plan_boundary": "Límite de planta / área",
+    "reference": "Referencia / auxiliar", "hatch": "Achurado",
+    "annotation": "Texto / cota", "furniture": "Mobiliario",
+    "opening": "Puerta / ventana / vano", "equipment": "Equipamiento",
+    "detail": "Detalle", "unknown": "Sin clasificar",
+}
+EXCLUDED_CATEGORIES = {"projection", "plan_boundary", "reference", "hatch",
+                       "annotation", "furniture", "opening", "equipment", "detail"}
+COMPARABLE_CATEGORIES = {"wall", "low_wall", "column", "primary_beam",
+                         "secondary_beam", "stair"}
+
+
+def default_layer_category(layer: str) -> str:
+    return LAYER_CATEGORY_DEFAULTS.get(str(layer).strip().casefold(), "unknown")
+
+
 def _distance_point_line(px: float, py: float, ax: float, ay: float,
                          ux: float, uy: float) -> float:
     return abs((px - ax) * uy - (py - ay) * ux)
@@ -129,20 +169,67 @@ def _segment_coverage(target: Segment, candidates: list[Segment],
     return min(1.0, covered / target.length), best_index, best_offset, best_angle
 
 
+
 def compare_floors(lower: FloorDrawing, upper: FloorDrawing,
                    tolerance: float = 0.15, angle_tolerance: float = 5.0,
-                   full_ratio: float = 0.85) -> list[ContinuityMatch]:
-    """Compare both drawings by geometric coverage, allowing split/merged segments."""
-    matches: list[ContinuityMatch] = []
-    for upper_index, segment in enumerate(upper.segments):
-        ratio, lower_index, offset, angle = _segment_coverage(segment, lower.segments, tolerance, angle_tolerance)
-        status = "continuous" if ratio >= full_ratio else "partial" if ratio > 1e-9 else "appears"
-        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle, "upper"))
-    for lower_index, segment in enumerate(lower.segments):
-        ratio, upper_index, offset, angle = _segment_coverage(segment, upper.segments, tolerance, angle_tolerance)
-        status = "continuous" if ratio >= full_ratio else "partial" if ratio > 1e-9 else "disappears"
-        matches.append(ContinuityMatch(upper_index, lower_index, status, ratio, offset, angle, "lower"))
-    return matches
+                   full_ratio: float = 0.85,
+                   layer_categories: dict[str, str] | None = None) -> list[ContinuityMatch]:
+    """Compare geometry only within compatible semantic DXF layer categories."""
+    categories = layer_categories or {}
+
+    def category(segment: Segment) -> str:
+        return categories.get(segment.layer, default_layer_category(segment.layer))
+
+    def has_geometric_overlap(target: Segment, candidates: list[Segment]) -> bool:
+        return _segment_coverage(target, candidates, tolerance, angle_tolerance)[0] > 1e-9
+
+    results: list[ContinuityMatch] = []
+    for ui, segment in enumerate(upper.segments):
+        cat = category(segment)
+        if cat in EXCLUDED_CATEGORIES:
+            results.append(ContinuityMatch(ui, -1, "excluded", 0.0, math.inf, 180.0, "upper"))
+            continue
+        if cat not in COMPARABLE_CATEGORIES:
+            results.append(ContinuityMatch(ui, -1, "review", 0.0, math.inf, 180.0, "upper"))
+            continue
+        compatible = [(i, item) for i, item in enumerate(lower.segments)
+                      if category(item) == cat]
+        ratio, local_i, offset, angle = _segment_coverage(
+            segment, [item for _, item in compatible], tolerance, angle_tolerance)
+        if ratio >= full_ratio:
+            status = "continuous"
+        elif ratio > 1e-9:
+            status = "partial"
+        elif has_geometric_overlap(segment, lower.segments):
+            status = "review"
+        else:
+            status = "appears"
+        li = compatible[local_i][0] if local_i >= 0 else -1
+        results.append(ContinuityMatch(ui, li, status, ratio, offset, angle, "upper"))
+
+    for li, segment in enumerate(lower.segments):
+        cat = category(segment)
+        if cat in EXCLUDED_CATEGORIES:
+            results.append(ContinuityMatch(-1, li, "excluded", 0.0, math.inf, 180.0, "lower"))
+            continue
+        if cat not in COMPARABLE_CATEGORIES:
+            results.append(ContinuityMatch(-1, li, "review", 0.0, math.inf, 180.0, "lower"))
+            continue
+        compatible = [(i, item) for i, item in enumerate(upper.segments)
+                      if category(item) == cat]
+        ratio, local_i, offset, angle = _segment_coverage(
+            segment, [item for _, item in compatible], tolerance, angle_tolerance)
+        if ratio >= full_ratio:
+            status = "continuous"
+        elif ratio > 1e-9:
+            status = "partial"
+        elif has_geometric_overlap(segment, upper.segments):
+            status = "review"
+        else:
+            status = "disappears"
+        ui = compatible[local_i][0] if local_i >= 0 else -1
+        results.append(ContinuityMatch(ui, li, status, ratio, offset, angle, "lower"))
+    return results
 
 def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
              include_layers: Iterable[str] | None = None) -> FloorDrawing:
