@@ -172,7 +172,6 @@ def read_dxf(path: str | Path, level_name: str, chord_error: float = 0.10,
                 if entity.is_closed and len(points) > 2:
                     add_line(layer, points[-1], points[0], kind)
             elif kind in ("ARC", "CIRCLE"):
-                from ezdxf.math import arc_to_bulge
                 if kind == "CIRCLE":
                     center = entity.dxf.center
                     radius = float(entity.dxf.radius)
