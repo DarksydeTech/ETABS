@@ -55,6 +55,11 @@ class StructuralDesignTab(ttk.Frame):
         actions.pack(fill="x", pady=(0, 8))
         ttk.Button(actions, text="Generar propuesta y evaluar alternativas",
                    command=self.generate).pack(side="left")
+        self.level_var = tk.StringVar()
+        ttk.Label(actions, text="Nivel DXF:").pack(side="left", padx=(12, 3))
+        self.level_selector = ttk.Combobox(actions, textvariable=self.level_var,
+                                           state="readonly", width=18)
+        self.level_selector.pack(side="left")
         self.alt_var = tk.StringVar()
         ttk.Label(actions, text="Alternativa:").pack(side="left", padx=(12, 3))
         self.alt_selector = ttk.Combobox(actions, textvariable=self.alt_var,
@@ -98,10 +103,15 @@ class StructuralDesignTab(ttk.Frame):
             messagebox.showinfo("Propuesta estructural", "Primero importa un DXF en Continuidad arquitectónica.", parent=self)
             return
         try:
+            names = [drawing.name for drawing in drawings]
+            self.level_selector["values"] = names
+            if self.level_var.get() not in names:
+                self.level_selector.current(0)
+            selected_drawing = next(d for d in drawings if d.name == self.level_var.get())
             number = int(self.floor.get())
             scale = {"m": 1.0, "cm": 0.01, "mm": 0.001}[self.units.get()]
             self.proposal = generate_proposal(
-                drawings[0], self.architectural_tab.layer_categories,
+                selected_drawing, self.architectural_tab.layer_categories,
                 system=self.system.get(), unit_scale=scale,
                 tolerance=float(self.tolerance.get()), stories=max(1, number),
                 fc=float(self.fc.get()), dead_load=float(self.dead.get()),
