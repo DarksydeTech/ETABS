@@ -123,8 +123,22 @@ La pestaña **8 · Continuidad arquitectónica** permite importar un archivo DXF
 por nivel, conservar la capa de origen y comparar los segmentos lineales entre
 dos plantas consecutivas. Reconoce entidades LINE, LWPOLYLINE, POLYLINE, ARC,
 CIRCLE e INSERT (bloques); los arcos y círculos se discretizan en segmentos.
-Incluye superposición gráfica, alineación inicial por centroide y clasificación
-geométrica de trazos continuos, parciales, que aparecen o desaparecen.
+Incluye superposición gráfica, alineación inicial por centro de extensión y
+comparación de todos los pares de niveles consecutivos. La comparación combina
+cobertura geométrica con clasificación semántica de capas: solo compara como
+continuidad categorías compatibles. La interfaz permite editar la categoría
+asignada a cada capa DXF mediante **Clasificar capas**.
+
+La clasificación inicial reconoce, entre otras, las capas `MUROS`,
+`MUROS-BAJOS`, `COLUMNAS`, `VIGAS VP`, `VIGAS VS` y `ESCALERA`.
+Las capas `PROYECCIONES`, `PLANTA`, `PLANTAS1`, `PLANTS` y `CASCO`
+se tratan inicialmente como proyecciones o límites de planta y se excluyen
+del diagnóstico de continuidad constructiva. Las capas desconocidas quedan
+marcadas para revisión, no se consideran muros automáticamente.
+
+Los resultados distinguen continuidad, continuidad parcial, aparición,
+desaparición, coincidencia geométrica entre categorías constructivas distintas
+(pendiente de revisión) y geometría excluida.
 
 Instalación de la dependencia adicional:
 
@@ -132,9 +146,12 @@ Instalación de la dependencia adicional:
 py -m pip install -r requirements.txt
 ```
 
-**Importante:** la comparación es geométrica y preliminar. La alineación por
-centroide solo corrige traslaciones; no rota ni escala planos. Las unidades DXF
-se conservan como unidades de dibujo y deben coincidir entre niveles. La
-continuidad arquitectónica no demuestra que un muro sea estructural ni valida
-su capacidad, detallado o cumplimiento de la E.030/E.060. Antes de usar los
-resultados en el modelo ETABS, verifica capas, escala, orientación y geometría.
+**Importante:** la clasificación automática de capas es una sugerencia editable,
+no una interpretación infalible del dibujo. La coincidencia de líneas de
+categorías incompatibles nunca se declara continuidad. La alineación por centro
+de extensión solo corrige traslaciones; no rota ni escala planos. Las unidades
+DXF se conservan como unidades de dibujo y deben coincidir entre niveles.
+La continuidad arquitectónica no demuestra que un muro sea estructural ni
+valida su capacidad, detallado o cumplimiento de la E.030/E.060. Antes de usar
+los resultados en el modelo ETABS, verifica capas, escala, orientación y
+geometría.
