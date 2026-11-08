@@ -200,7 +200,8 @@ def compare_floors(lower: FloorDrawing, upper: FloorDrawing,
             status = "continuous"
         elif ratio > 1e-9:
             status = "partial"
-        elif has_geometric_overlap(segment, lower.segments):
+        elif has_geometric_overlap(segment, [item for item in lower.segments
+                                             if category(item) in COMPARABLE_CATEGORIES and category(item) != cat]):
             status = "review"
         else:
             status = "appears"
@@ -223,7 +224,8 @@ def compare_floors(lower: FloorDrawing, upper: FloorDrawing,
             status = "continuous"
         elif ratio > 1e-9:
             status = "partial"
-        elif has_geometric_overlap(segment, upper.segments):
+        elif has_geometric_overlap(segment, [item for item in upper.segments
+                                             if category(item) in COMPARABLE_CATEGORIES and category(item) != cat]):
             status = "review"
         else:
             status = "disappears"
