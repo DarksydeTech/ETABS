@@ -4,6 +4,7 @@ import unittest
 from etabs_gui.architectural import (
     FloorDrawing, Segment, align_by_centroid, alignment_offsets_by_bounds,
     apply_alignment_offsets, compare_floors, compare_segments,
+    default_layer_category,
 )
 
 
@@ -121,6 +122,19 @@ class ContinuityTests(unittest.TestCase):
         upper = FloorDrawing("P2", "p2.dxf", [Segment("COLUMNAS", 0, 0, 5, 0)])
         matches = compare_floors(lower, upper)
         self.assertTrue(all(m.status == "review" for m in matches))
+
+
+    def test_low_wall_is_not_compared_as_regular_wall(self):
+        lower = FloorDrawing("P1", "p1.dxf", [Segment("MUROS", 0, 0, 5, 0)])
+        upper = FloorDrawing("P2", "p2.dxf", [Segment("MUROS-BAJOS", 0, 0, 5, 0)])
+        matches = compare_floors(lower, upper)
+        self.assertEqual(next(m for m in matches if m.side == "lower").status, "review")
+        self.assertEqual(next(m for m in matches if m.side == "upper").status, "review")
+
+    def test_common_low_wall_layer_name_variants_are_classified(self):
+        for layer in ("MUROS-BAJOS", "MUROS BAJOS", "MUROS_BAJOS", " muros---bajos "):
+            with self.subTest(layer=layer):
+                self.assertEqual(default_layer_category(layer), "low_wall")
 
     def test_layer_classification_can_be_overridden(self):
         lower = FloorDrawing("P1", "p1.dxf", [Segment("ARQ-MURO", 0, 0, 5, 0)])
