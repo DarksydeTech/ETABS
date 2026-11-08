@@ -1088,6 +1088,58 @@ derivado debe vivir en `template` o `model`, no en la interfaz.
 
 ---
 
+## 18. Etiqueta de desarrollo · `predimensionamiento-estructural-automatico`
+
+### 18.1 Integración
+
+La pestaña 9 (`StructuralDesignTab`) recibe la instancia del analizador
+arquitectónico y el proyecto activo. Reutiliza los dibujos DXF cargados, la
+clasificación de capas y el número de niveles del proyecto. La geometría DXF
+se convierte a metros según la unidad seleccionada por el usuario.
+
+### 18.2 Los tres desarrollos incorporados
+
+- **Propuesta geométrica:** `structural_design.py` genera nodos candidatos
+  desde extremos e intersecciones de capas clasificadas como muro o columna.
+  Conecta candidatos alineados dentro de la luz máxima indicada. Los paños
+  rectangulares requieren candidatos en sus cuatro esquinas y vigas candidatas
+  en los cuatro lados.
+- **Predimensionamiento:** propone secciones guía de vigas con relaciones
+  geométricas iniciales y una referencia de sección cuadrada de columna basada
+  en cargas uniformes, número de pisos y un área tributaria supuesta. Para
+  losas, usa la relación entre lados como orientación preliminar.
+- **Alternativas:** presenta tres subconjuntos de nodos priorizados por
+  puntuación geométrica. La vista distingue los nodos seleccionados. Los
+  criterios y advertencias se conservan en el resultado del motor.
+
+### 18.3 Restricciones de ingeniería
+
+Los puntos son candidatos, no columnas aprobadas. Los muros DXF pueden ser
+tabiquería; la clasificación de capa no acredita su condición portante. Los
+muros bajos/parapetos se excluyen de la generación de apoyos. La detección de
+losas se limita a celdas rectangulares con cuatro lados apoyados por vigas
+candidatas; no resuelve paños irregulares, huecos ni condiciones reales de
+borde. Las secciones no son verificaciones de resistencia ni de servicio.
+
+El módulo no ejecuta análisis estructural, no dimensiona placas del sistema
+dual, no verifica E.030/E.060/E.070, derivas, torsión, flexocompresión,
+esbeltez, cortante, confinamiento, cimentaciones ni refuerzo. Los valores de
+carga y el área tributaria usados para la referencia de columna son hipótesis
+editables, no resultados de un modelo de cargas. La alternativa con menos
+elementos no se debe interpretar como óptima sin análisis.
+
+No existe transferencia automática a `Project.plan` ni exportación directa a
+ETABS en esta versión. La separación es intencional: evita alterar las grillas
+y el modelo existente sin revisión del usuario. Una integración posterior debe
+convertir las propuestas aprobadas a entidades editables del modelo y conservar
+la trazabilidad entre DXF, nivel y elemento estructural.
+
+### 18.4 Archivos
+
+- `etabs_gui/structural_design.py`: motor geométrico, estimaciones y alternativas.
+- `etabs_gui/structural_design_tab.py`: interfaz de la pestaña 9.
+- `tests/test_structural_design.py`: pruebas unitarias del motor.
+
 ## Anexo A · Árbol del repositorio
 
 ```
