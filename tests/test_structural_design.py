@@ -38,6 +38,23 @@ class StructuralProposalTests(unittest.TestCase):
         self.assertEqual(len(alternatives), 3)
         self.assertIn("placas", " ".join(proposal.notes).lower())
 
+
+    def test_slab_panel_requires_four_supported_edges(self):
+        drawing = FloorDrawing("P1", "p1.dxf", [
+            Segment("MUROS", 0, 0, 4, 0),
+            Segment("MUROS", 4, 0, 4, 3),
+            Segment("MUROS", 4, 3, 0, 3),
+            Segment("MUROS", 0, 3, 0, 0),
+        ])
+        result = generate_proposal(drawing)
+        self.assertEqual(len(result.slabs), 1)
+        self.assertAlmostEqual(result.slabs[0].area, 12.0)
+
+    def test_negative_max_span_is_rejected(self):
+        drawing = FloorDrawing("P1", "p1.dxf", [Segment("MUROS", 0, 0, 4, 0)])
+        with self.assertRaises(ValueError):
+            generate_proposal(drawing, max_span=-1)
+
     def test_unknown_layers_are_not_assumed_structural(self):
         drawing = FloorDrawing("P1", "p1.dxf", [Segment("LAYER_X", 0, 0, 4, 0)])
         self.assertEqual(generate_proposal(drawing).nodes, [])
