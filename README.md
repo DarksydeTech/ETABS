@@ -25,7 +25,7 @@ La ventana abre con un proyecto nuevo generado desde la plantilla 4.0:
 
 ## Dónde se ingresan los datos
 
-La ventana tiene siete pestañas. Todos los valores se editan con doble clic
+La ventana tiene ocho pestañas. Todos los valores se editan con doble clic
 sobre la celda (o `Enter`), y los cambios regeneran la planta y la validación.
 
 1. **Proyecto y grillas**
