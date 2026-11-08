@@ -25,7 +25,7 @@ La ventana abre con un proyecto nuevo generado desde la plantilla 4.0:
 
 ## Dónde se ingresan los datos
 
-La ventana tiene ocho pestañas. Todos los valores se editan con doble clic
+La ventana tiene nueve pestañas. Todos los valores se editan con doble clic
 sobre la celda (o `Enter`), y los cambios regeneran la planta y la validación.
 
 1. **Proyecto y grillas**
@@ -96,7 +96,9 @@ sobre la celda (o `Enter`), y los cambios regeneran la planta y la validación.
 | `plan.py` | Geometría: grillas, extensión inclinada de 1.5 m, vigas, recorrido de caras para losas y muros. |
 | `model.py` | Modelo `Project`, guardado/carga JSON, validación e importación opcional de Excel. |
 | `etabs.py` | Puente COM (`comtypes`) con ETABS: niveles, grillas, materiales, secciones, áreas, cargas, combos y planta. |
-| `app.py` | Interfaz Tkinter con las siete pestañas. |
+| `app.py` | Interfaz Tkinter con las nueve pestañas. |
+| `architectural.py` / `architectural_tab.py` | Importación DXF, clasificación semántica y continuidad entre niveles. |
+| `structural_design.py` / `structural_design_tab.py` | Propuesta geométrica, predimensionamiento preliminar y evaluación de alternativas desde DXF. |
 
 ## Requisitos y alcance
 
