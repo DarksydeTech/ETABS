@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import math
 from pathlib import Path
+import re
 from typing import Iterable
 
 
@@ -63,7 +64,7 @@ LAYER_CATEGORY_DEFAULTS = {
     "a-textos": "annotation", "a-textos2": "annotation",
     "a-titulos": "annotation", "texto-1": "annotation",
     "textos2": "annotation", "textos4": "annotation",
-    "muebles": "furniture", "a_mueble": "furniture",
+    "muebles": "furniture", "a-mueble": "furniture",
     "puerta": "opening", "puertas": "opening",
     "puertas-ventanas": "opening", "ventana": "opening", "vano": "opening",
     "sanitarios": "equipment", "lavaderos": "equipment",
@@ -87,8 +88,16 @@ COMPARABLE_CATEGORIES = {"wall", "low_wall", "column", "primary_beam",
                          "secondary_beam", "stair"}
 
 
+def normalize_layer_name(layer: str) -> str:
+    """Normalize common DXF layer-name variants without changing the source layer."""
+    normalized = str(layer).strip().casefold()
+    normalized = normalized.replace("_", "-").replace(" ", "-")
+    normalized = normalized.replace("–", "-").replace("—", "-")
+    return re.sub(r"-+", "-", normalized).strip("-")
+
+
 def default_layer_category(layer: str) -> str:
-    return LAYER_CATEGORY_DEFAULTS.get(str(layer).strip().casefold(), "unknown")
+    return LAYER_CATEGORY_DEFAULTS.get(normalize_layer_name(layer), "unknown")
 
 
 def _distance_point_line(px: float, py: float, ax: float, ay: float,
