@@ -84,7 +84,7 @@ def compare_segments(a: Segment, b: Segment, tolerance: float = 0.15,
     a0, a1 = _segment_projection(a, a.x1, a.y1, ux, uy)
     b0, b1 = _segment_projection(b, a.x1, a.y1, ux, uy)
     overlap = max(0.0, min(a1, b1) - max(a0, b0))
-    ratio = overlap / max(min(a.length, b.length), 1e-9)
+    ratio = overlap / max(max(a.length, b.length), 1e-9)
     return min(1.0, ratio), offset, angle
 
 
