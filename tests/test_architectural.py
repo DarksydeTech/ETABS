@@ -2,7 +2,7 @@
 import unittest
 
 from etabs_gui.architectural import (
-    FloorDrawing, Segment, align_by_centroid, compare_floors, compare_segments,
+    FloorDrawing, Segment, align_by_centroid, alignment_offsets_by_bounds,\n    apply_alignment_offsets, compare_floors, compare_segments,
 )
 
 
