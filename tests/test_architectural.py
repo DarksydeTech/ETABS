@@ -61,5 +61,39 @@ class ContinuityTests(unittest.TestCase):
         self.assertAlmostEqual(second.segments[0].y1, 0.0)
 
 
+    def test_split_wall_segments_are_continuous(self):
+        lower = FloorDrawing("P1", "p1.dxf", [
+            Segment("WALL", 0, 0, 5, 0),
+        ])
+        upper = FloorDrawing("P2", "p2.dxf", [
+            Segment("WALL", 0, 0, 2.5, 0),
+            Segment("WALL", 2.5, 0, 5, 0),
+        ])
+        matches = compare_floors(lower, upper)
+        self.assertTrue(all(match.status == "continuous" for match in matches))
+
+    def test_unmatched_geometry_is_reported_on_both_sides(self):
+        lower = FloorDrawing("P1", "p1.dxf", [
+            Segment("WALL", 0, 0, 5, 0),
+        ])
+        upper = FloorDrawing("P2", "p2.dxf", [
+            Segment("WALL", 20, 0, 25, 0),
+        ])
+        matches = compare_floors(lower, upper)
+        self.assertEqual(matches[0].status, "appears")
+        self.assertEqual(matches[1].status, "disappears")
+
+    def test_coverage_distinguishes_partial_from_full(self):
+        lower = FloorDrawing("P1", "p1.dxf", [
+            Segment("WALL", 0, 0, 5, 0),
+        ])
+        upper = FloorDrawing("P2", "p2.dxf", [
+            Segment("WALL", 0, 0, 10, 0),
+        ])
+        matches = compare_floors(lower, upper)
+        self.assertEqual(matches[0].status, "partial")
+        self.assertEqual(matches[1].status, "continuous")
+
+
 if __name__ == "__main__":
     unittest.main()
