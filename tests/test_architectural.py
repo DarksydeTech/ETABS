@@ -19,7 +19,7 @@ class ContinuityTests(unittest.TestCase):
         lower = FloorDrawing("P1", "p1.dxf", [Segment("WALL", 0, 0, 5, 0)])
         upper = FloorDrawing("P2", "p2.dxf", [Segment("WALL", 2, 0, 5, 0)])
         matches = compare_floors(lower, upper)
-        self.assertEqual(matches[0].status, "continuous")
+        self.assertEqual(matches[0].status, "partial")
 
     def test_offset_outside_tolerance_is_not_matched(self):
         a = Segment("WALL", 0, 0, 5, 0)
