@@ -95,5 +95,38 @@ class ContinuityTests(unittest.TestCase):
         self.assertEqual(matches[1].status, "continuous")
 
 
+    def test_projection_coincidence_does_not_count_as_wall_continuity(self):
+        lower = FloorDrawing("P1", "p1.dxf", [
+            Segment("MUROS", 0, 0, 5, 0),
+        ])
+        upper = FloorDrawing("P2", "p2.dxf", [
+            Segment("PROYECCIONES", 0, 0, 5, 0),
+        ])
+        matches = compare_floors(lower, upper)
+        wall_result = next(m for m in matches if m.side == "lower")
+        projection_result = next(m for m in matches if m.side == "upper")
+        self.assertEqual(wall_result.status, "disappears")
+        self.assertEqual(projection_result.status, "excluded")
+
+    def test_plan_boundary_coincidence_does_not_count_as_wall(self):
+        lower = FloorDrawing("P1", "p1.dxf", [Segment("MUROS", 0, 0, 5, 0)])
+        upper = FloorDrawing("P2", "p2.dxf", [Segment("PLANTA", 0, 0, 5, 0)])
+        matches = compare_floors(lower, upper)
+        self.assertEqual(next(m for m in matches if m.side == "lower").status, "disappears")
+        self.assertEqual(next(m for m in matches if m.side == "upper").status, "excluded")
+
+    def test_different_constructed_categories_are_flagged_for_review(self):
+        lower = FloorDrawing("P1", "p1.dxf", [Segment("MUROS", 0, 0, 5, 0)])
+        upper = FloorDrawing("P2", "p2.dxf", [Segment("COLUMNAS", 0, 0, 5, 0)])
+        matches = compare_floors(lower, upper)
+        self.assertTrue(all(m.status == "review" for m in matches))
+
+    def test_layer_classification_can_be_overridden(self):
+        lower = FloorDrawing("P1", "p1.dxf", [Segment("ARQ-MURO", 0, 0, 5, 0)])
+        upper = FloorDrawing("P2", "p2.dxf", [Segment("MUROS", 0, 0, 5, 0)])
+        matches = compare_floors(lower, upper, layer_categories={"ARQ-MURO": "wall"})
+        self.assertTrue(all(m.status == "continuous" for m in matches))
+
+
 if __name__ == "__main__":
     unittest.main()
